@@ -99,3 +99,9 @@ ENV/
 
 # mypy
 .mypy_cache/
+
+# custom
+.idea
+/data/mnist
+/data/tmp
+/data/casia
