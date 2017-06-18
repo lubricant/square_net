@@ -1,4 +1,5 @@
 import struct
+import math
 
 import cv2
 
@@ -41,14 +42,51 @@ def proc(image, filters):
         plt.imshow(res[temp], cmap='gray' )
     plt.show()
 
+#
+# class Distort(object):
+#
+#     def __init__(self, aa, k=0.3):
+#
+#         def distort_trans(a, t):
+#             assert 0 <= t <= 1
+#             a = a if t <= .5 else -a
+#             b = 1 if t <= .5 else 0
+#             t = 2 * (t if t <= .5 else t - .5)
+#             return .5 * (b + (1-math.exp(-a*t))/(1-math.exp(-a)))
+#
+#         self.__test = lambda x: k * x + distort_trans(aa, x)
+#
+#     def transform(self, image):
+#
+#         rows, cols = image.shape
+#         image_dt = np.zeros(image.shape)
+#         for y in np.arange(0., rows):
+#             y_dt = y
+#             for x in np.arange(0., cols):
+#                 x_dt = (self.__test(x/cols) * cols)
+#                 x_dt = np.minimum(np.maximum(round(x_dt), 0), cols-1)
+#                 image_dt[y, x] = image[y_dt, x_dt]
+#
+#         return image_dt
 
-def transfer(x, eta, alpha=0, beta=1,  gamma=0):
-    affine = np.pi * beta * x + alpha
-    return eta * (np.sin(affine) * np.cos(affine) + gamma)
+
+def binary(image):
+    a = cv2.threshold(img, np.mean(image), 255, cv2.THRESH_TOZERO)
+    b = cv2.threshold(img, 0, 255, cv2.THRESH_OTSU)
+    plt.subplot(1, 3, 1)
+    plt.imshow(image, cmap='gray')
+    plt.subplot(1, 3, 2)
+    plt.imshow(a[1], cmap='gray')
+    plt.subplot(1, 3, 3)
+    plt.imshow(b[1], cmap='gray')
+    plt.show()
 
 
 for ch, img in CasiaFile('1001-c.gnt'):
     # print(ch)
     # proc(img, gabor_filters())
-
+    # binary(img)
     break
+
+
+
