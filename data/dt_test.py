@@ -5,6 +5,8 @@ import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.widgets import Slider
 
+from data import CasiaFile
+
 
 class Deform(object):
 
@@ -37,8 +39,6 @@ class Deform(object):
 
     def transform(self, image, flag):
 
-        print(bin(0x7), bin(0x38))
-
         horizon, vertical = flag & 0x7, flag & 0x38
         horizon_dt, vertical_dt = None, None
 
@@ -48,10 +48,8 @@ class Deform(object):
             horizon_dt = self.__right
         elif horizon == Deform.DT_HORIZON_EXPAND:
             horizon_dt = self.__expand
-            print('HE')
         elif horizon == Deform.DT_HORIZON_SHRINK:
             horizon_dt = self.__shrink
-            print('HS')
 
         if vertical == Deform.DT_TOP:
             vertical_dt = self.__top
@@ -59,10 +57,8 @@ class Deform(object):
             vertical_dt = self.__bottom
         elif vertical == Deform.DT_VERTICAL_EXPAND:
             vertical_dt = self.__expand
-            print('VE')
         elif vertical == Deform.DT_VERTICAL_SHRINK:
             vertical_dt = self.__shrink
-            print('VS')
 
         image_dt = np.zeros(image.shape)
 
@@ -78,34 +74,37 @@ class Deform(object):
         return image_dt
 
 
-def deform(eta=1, image=Deform.example()):
+def deform(image, eta=1):
     trans = Deform(eta)
-    plt.subplot(2, 4, 1)
+    plt.subplot(3, 4, 1)
     plt.imshow(trans.transform(image, Deform.DT_LEFT), cmap='gray')
-    plt.subplot(2, 4, 2)
+    plt.subplot(3, 4, 2)
     plt.imshow(trans.transform(image, Deform.DT_RIGHT), cmap='gray')
-    plt.subplot(2, 4, 3)
+    plt.subplot(3, 4, 3)
     plt.imshow(trans.transform(image, Deform.DT_HORIZON_EXPAND), cmap='gray')
-    plt.subplot(2, 4, 4)
+    plt.subplot(3, 4, 4)
     plt.imshow(trans.transform(image, Deform.DT_HORIZON_SHRINK), cmap='gray')
 
-    plt.subplot(2, 4, 5)
+    plt.subplot(3, 4, 5)
     plt.imshow(trans.transform(image, Deform.DT_TOP), cmap='gray')
-    plt.subplot(2, 4, 6)
+    plt.subplot(3, 4, 6)
     plt.imshow(trans.transform(image, Deform.DT_BOTTOM), cmap='gray')
-    plt.subplot(2, 4, 7)
+    plt.subplot(3, 4, 7)
     plt.imshow(trans.transform(image, Deform.DT_VERTICAL_EXPAND), cmap='gray')
-    plt.subplot(2, 4, 8)
+    plt.subplot(3, 4, 8)
     plt.imshow(trans.transform(image, Deform.DT_VERTICAL_SHRINK), cmap='gray')
 
 
-fig, ax = plt.subplots()
-slid = Slider(ax, 'eta', 0.1, 2.0, valinit=1)
+_, img = next(iter(CasiaFile('1001-c.gnt')))
+splt = plt.subplot(3, 1, 3)
+slid = Slider(splt, 'eta', 0.001, 1.0, valinit=1)
+
+deform(img)
+
 
 def update(val):
     eta = slid.val
-    deform(eta)
-    fig.canvas.draw_idle()
+    deform(img, eta)
 
 slid.on_changed(update)
 
