@@ -42,33 +42,6 @@ def proc(image, filters):
         plt.imshow(res[temp], cmap='gray' )
     plt.show()
 
-#
-# class Distort(object):
-#
-#     def __init__(self, aa, k=0.3):
-#
-#         def distort_trans(a, t):
-#             assert 0 <= t <= 1
-#             a = a if t <= .5 else -a
-#             b = 1 if t <= .5 else 0
-#             t = 2 * (t if t <= .5 else t - .5)
-#             return .5 * (b + (1-math.exp(-a*t))/(1-math.exp(-a)))
-#
-#         self.__test = lambda x: k * x + distort_trans(aa, x)
-#
-#     def transform(self, image):
-#
-#         rows, cols = image.shape
-#         image_dt = np.zeros(image.shape)
-#         for y in np.arange(0., rows):
-#             y_dt = y
-#             for x in np.arange(0., cols):
-#                 x_dt = (self.__test(x/cols) * cols)
-#                 x_dt = np.minimum(np.maximum(round(x_dt), 0), cols-1)
-#                 image_dt[y, x] = image[y_dt, x_dt]
-#
-#         return image_dt
-
 
 def binary(image):
     a = cv2.threshold(img, np.mean(image), 255, cv2.THRESH_TOZERO)
