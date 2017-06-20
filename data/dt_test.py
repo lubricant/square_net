@@ -56,15 +56,6 @@ class Deform(object):
         self.__expand = lambda x: x + deform_trans(x, 0., 1.)
         self.__shrink = lambda x: x - deform_trans(x, 0., 1.)
 
-    @staticmethod
-    def example():
-        offset = 5
-        example = np.ones((100, 100))
-        example[:, :] = 255
-        example[offset:100:offset] = 0
-        example[:, offset:100:offset] = 0
-        return example
-
     def transform(self, image, flag):
 
         horizon, vertical = flag & 0x7, flag & 0x38
@@ -88,60 +79,72 @@ class Deform(object):
         elif vertical == Deform.DT_VERTICAL_SHRINK:
             vertical_dt = self.__shrink
 
-        image_dt = np.zeros(image.shape)
+        def prepare(i, size, dt_func):
+            i = (dt_func(i / size) * size) if dt_func else i
+            return int(round(np.minimum(np.maximum(i, 0), size - 1)))
 
         rows, cols = image.shape
+        y_dt = [prepare(y, rows, vertical_dt) for y in range(0, rows)]
+        x_dt = [prepare(x, cols, horizon_dt) for x in range(0, cols)]
+        image_dt = np.zeros(image.shape)
         for y in range(0, rows):
-            y_dt = (vertical_dt(y/rows) * rows) if vertical_dt else y
-            y_dt = np.minimum(np.maximum(round(y_dt), 0), rows-1)
             for x in range(0, cols):
-                x_dt = (horizon_dt(x/cols) * cols) if horizon_dt else x
-                x_dt = np.minimum(np.maximum(round(x_dt), 0), cols-1)
-                image_dt[y, x] = image[y_dt, x_dt]
+                image_dt[y, x] = image[y_dt[y], x_dt[x]]
 
         return image_dt
 
 
-def deform(image, eta=1):
-    trans = Deform(eta)
-    plt.subplot(3, 4, 1)
-    plt.title('LEFT')
-    plt.imshow(trans.transform(image, Deform.DT_LEFT), cmap='gray')
-    plt.subplot(3, 4, 2)
-    plt.title('RIGHT')
-    plt.imshow(trans.transform(image, Deform.DT_RIGHT), cmap='gray')
-    plt.subplot(3, 4, 3)
-    plt.title('H_EXPAND')
-    plt.imshow(trans.transform(image, Deform.DT_HORIZON_EXPAND), cmap='gray')
-    plt.subplot(3, 4, 4)
-    plt.title('H_SHRINK')
-    plt.imshow(trans.transform(image, Deform.DT_HORIZON_SHRINK), cmap='gray')
+if __name__ == '__main__':
 
-    plt.subplot(3, 4, 5)
-    plt.title('TOP')
-    plt.imshow(trans.transform(image, Deform.DT_TOP), cmap='gray')
-    plt.subplot(3, 4, 6)
-    plt.title('BOTTOM')
-    plt.imshow(trans.transform(image, Deform.DT_BOTTOM), cmap='gray')
-    plt.subplot(3, 4, 7)
-    plt.title('V_EXPAND')
-    plt.imshow(trans.transform(image, Deform.DT_VERTICAL_EXPAND), cmap='gray')
-    plt.subplot(3, 4, 8)
-    plt.title('V_SHRINK')
-    plt.imshow(trans.transform(image, Deform.DT_VERTICAL_SHRINK), cmap='gray')
+    def example_img():
+        offset = 5
+        example = np.ones((100, 100))
+        example[:, :] = 255
+        example[offset:100:offset] = 0
+        example[:, offset:100:offset] = 0
+        return example
+
+    _, img = next(iter(CasiaFile('1001-c.gnt')))
 
 
-_, img = next(iter(CasiaFile('1001-c.gnt')))
-splt = plt.subplot(3, 1, 3)
-slid = Slider(splt, 'eta', 0.001, 5.0, valinit=1)
+    def update_distort(eta):
+        pass
 
-deform(img)
+    def update_deform(eta):
+        trans = Deform(eta)
+        plt.subplot(3, 4, 1)
+        plt.title('LEFT')
+        plt.imshow(trans.transform(img, Deform.DT_LEFT), cmap='gray')
+        plt.subplot(3, 4, 2)
+        plt.title('RIGHT')
+        plt.imshow(trans.transform(img, Deform.DT_RIGHT), cmap='gray')
+        plt.subplot(3, 4, 3)
+        plt.title('H_EXPAND')
+        plt.imshow(trans.transform(img, Deform.DT_HORIZON_EXPAND), cmap='gray')
+        plt.subplot(3, 4, 4)
+        plt.title('H_SHRINK')
+        plt.imshow(trans.transform(img, Deform.DT_HORIZON_SHRINK), cmap='gray')
+
+        plt.subplot(3, 4, 5)
+        plt.title('TOP')
+        plt.imshow(trans.transform(img, Deform.DT_TOP), cmap='gray')
+        plt.subplot(3, 4, 6)
+        plt.title('BOTTOM')
+        plt.imshow(trans.transform(img, Deform.DT_BOTTOM), cmap='gray')
+        plt.subplot(3, 4, 7)
+        plt.title('V_EXPAND')
+        plt.imshow(trans.transform(img, Deform.DT_VERTICAL_EXPAND), cmap='gray')
+        plt.subplot(3, 4, 8)
+        plt.title('V_SHRINK')
+        plt.imshow(trans.transform(img, Deform.DT_VERTICAL_SHRINK), cmap='gray')
+
+    update = update_deform
+
+    update(1.)
+    slid = Slider(plt.subplot(3, 1, 3), 'eta', 0.001, 5.0, valinit=1)
+    slid.on_changed(update)
+    plt.show()
 
 
-def update(val):
-    eta = slid.val
-    deform(img, eta)
 
-slid.on_changed(update)
 
-plt.show()
