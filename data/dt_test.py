@@ -48,27 +48,13 @@ class Deform(object):
     def __init__(self, eta=1.):
         def deform_trans(x, a, b):
             affine = (b - a) * x + a
-            return np.sin(affine) * np.cos(affine) - np.sin(b) * np.cos(b)
+            return eta * x * (
+                math.sin(affine) * math.cos(affine) - math.sin(b) * math.cos(b))
 
-        self.__left = self.__top = lambda x: x + eta * deform_trans(x, 0., .5)
-        self.__right = self.__bottom = lambda x: x + eta * deform_trans(x, .5, 1.)
-        self.__expand = lambda x: x + eta * deform_trans(x, 0., 1.)
-        self.__shrink = lambda x: x - eta * deform_trans(x, 0., 1.)
-
-        # t = np.arange(0.0, 1.0, 0.001)
-        # plt.subplot(2, 2, 1)
-        # plt.title('LEFT/TOP')
-        # plt.plot(t, deform_trans(t, 0., .5), lw=2, color='red')
-        # plt.subplot(2, 2, 2)
-        # plt.title('RIGHT/BOTTOM')
-        # plt.plot(t, deform_trans(t, .5, 1.), lw=2, color='red')
-        # plt.subplot(2, 2, 3)
-        # plt.title('EXPAND')
-        # plt.plot(t, self.__expand(t), lw=2, color='red')
-        # plt.subplot(2, 2, 4)
-        # plt.title('SHRINK')
-        # plt.plot(t, self.__shrink(t), lw=2, color='red')
-        # plt.show()
+        self.__left = self.__top = lambda x: x + deform_trans(x, 0., .5)
+        self.__right = self.__bottom = lambda x: x + deform_trans(x, .5, 1.)
+        self.__expand = lambda x: x + deform_trans(x, 0., 1.)
+        self.__shrink = lambda x: x - deform_trans(x, 0., 1.)
 
     @staticmethod
     def example():
@@ -125,19 +111,23 @@ def deform(image, eta=1):
     plt.title('RIGHT')
     plt.imshow(trans.transform(image, Deform.DT_RIGHT), cmap='gray')
     plt.subplot(3, 4, 3)
-    plt.title('HORIZON_EXPAND')
+    plt.title('H_EXPAND')
     plt.imshow(trans.transform(image, Deform.DT_HORIZON_EXPAND), cmap='gray')
     plt.subplot(3, 4, 4)
-    plt.title('HORIZON_SHRINK')
+    plt.title('H_SHRINK')
     plt.imshow(trans.transform(image, Deform.DT_HORIZON_SHRINK), cmap='gray')
 
     plt.subplot(3, 4, 5)
+    plt.title('TOP')
     plt.imshow(trans.transform(image, Deform.DT_TOP), cmap='gray')
     plt.subplot(3, 4, 6)
+    plt.title('BOTTOM')
     plt.imshow(trans.transform(image, Deform.DT_BOTTOM), cmap='gray')
     plt.subplot(3, 4, 7)
+    plt.title('V_EXPAND')
     plt.imshow(trans.transform(image, Deform.DT_VERTICAL_EXPAND), cmap='gray')
     plt.subplot(3, 4, 8)
+    plt.title('V_SHRINK')
     plt.imshow(trans.transform(image, Deform.DT_VERTICAL_SHRINK), cmap='gray')
 
 
