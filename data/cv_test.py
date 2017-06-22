@@ -1,11 +1,8 @@
-import struct
-import math
 
 import cv2
 
 import numpy as np
 from matplotlib import pyplot as plt
-from PIL import Image
 
 from data import CasiaFile
 
@@ -35,8 +32,6 @@ class GaborFilter(object):
         self.__kernels = [
             cv2.getGaborKernel(size, 1, orient, wavelength, aspect_ratio, ktype=cv2.CV_32F)
             for orient in np.arange(0, np.pi, np.pi / 8)]
-
-        print(self.__kernels)
 
     def filter(self, image):
         features = np.zeros((8,) + image.shape)
