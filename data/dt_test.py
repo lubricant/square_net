@@ -10,12 +10,13 @@ from data import CasiaFile
 
 class Distort(object):
 
-    def __init__(self, aa, k=0.3):
+    def __init__(self, aa, k=0.):
 
         def distort_trans(a, t):
+            return (1-math.exp(-a*t))/(1-math.exp(-a))
             assert 0 <= t <= 1
             a = a if t <= .5 else -a
-            b = 1 if t <= .5 else 0
+            b = 0 if t <= .5 else 1
             t = 2 * (t if t <= .5 else t - .5)
             return .5 * (b + (1-math.exp(-a*t))/(1-math.exp(-a)))
 
@@ -23,14 +24,17 @@ class Distort(object):
 
     def transform(self, image):
 
+        def prepare(i, size, dt_func):
+            i = (dt_func(i / size) * size) if dt_func else i
+            return int(round(np.minimum(np.maximum(i, 0), size - 1)))
+
         rows, cols = image.shape
+        y_dt = [prepare(y, rows, self.__test) for y in range(0, rows)]
+        x_dt = [x for x in range(0, cols)]
         image_dt = np.zeros(image.shape)
-        for y in np.arange(0., rows):
-            y_dt = y
-            for x in np.arange(0., cols):
-                x_dt = (self.__test(x/cols) * cols)
-                x_dt = np.minimum(np.maximum(round(x_dt), 0), cols-1)
-                image_dt[y, x] = image[y_dt, x_dt]
+        for y in range(0, rows):
+            for x in range(0, cols):
+                image_dt[y, x] = image[y_dt[y], x_dt[x]]
 
         return image_dt
 
@@ -105,10 +109,30 @@ if __name__ == '__main__':
         return example
 
     _, img = next(iter(CasiaFile('1001-c.gnt')))
+    slid = None
 
+    def update_distort_k(k):
+        plt.subplot(2, 5, 1)
+        plt.title('')
+        plt.imshow(Distort(-2, k).transform(img), cmap='gray')
+        plt.subplot(2, 5, 2)
+        plt.title('')
+        plt.imshow(Distort(-1, k).transform(img), cmap='gray')
+        plt.subplot(2, 5, 3)
+        plt.title('')
+        plt.imshow(Distort(0.001, k).transform(img), cmap='gray')
+        plt.subplot(2, 5, 4)
+        plt.title('')
+        plt.imshow(Distort(1, k).transform(img), cmap='gray')
+        plt.subplot(2, 5, 5)
+        plt.title('')
+        plt.imshow(Distort(2, k).transform(img), cmap='gray')
 
-    def update_distort(eta):
-        pass
+    def update_distort_a(a):
+        plt.subplot(2, 5, 1)
+        plt.title('')
+        plt.imshow(Distort(a).transform(img), cmap='gray')
+
 
     def update_deform(eta):
         trans = Deform(eta)
@@ -138,10 +162,17 @@ if __name__ == '__main__':
         plt.title('V_SHRINK')
         plt.imshow(trans.transform(img, Deform.DT_VERTICAL_SHRINK), cmap='gray')
 
-    update = update_deform
+
+    # update = update_deform
+    # slid = Slider(plt.subplot(3, 1, 3), 'eta', 0.001, 5.0, valinit=1)
+
+    update = update_distort_a
+    slid = Slider(plt.subplot(2, 1, 2), 'a', -2.5, 2.5, valinit=1)
+
+    # update = update_distort_k
+    # slid = Slider(plt.subplot(2, 1, 2), 'k', 0.001, 5.0, valinit=1)
 
     update(1.)
-    slid = Slider(plt.subplot(3, 1, 3), 'eta', 0.001, 5.0, valinit=1)
     slid.on_changed(update)
     plt.show()
 
