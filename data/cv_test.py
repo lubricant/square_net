@@ -22,6 +22,40 @@ class BinaryFilter(object):
                 cv2.THRESH_BINARY_INV if self.__inverse else cv2.THRESH_BINARY))[1]
 
 
+class AlignFilter(object):
+
+    def __init__(self, size, pad_type='constant', pad_val=0):
+        assert pad_type or len(size) == 2
+        self.__size = size
+        self.__pad_type = pad_type
+        self.__pad_val = pad_val
+
+        if isinstance(pad_val, (int, float)):
+            self.__pad_val = ((pad_val, pad_val), (pad_val, pad_val))
+
+    def filter(self, image):
+        rows, cols = self.__size
+        i_rows, i_cols = image.shape
+
+        align_ratio, i_ratio = rows/cols, i_rows/i_cols
+        if i_ratio != align_ratio:
+            align_rows, align_cols = i_cols * align_ratio, i_rows / align_ratio
+            assert align_rows > i_rows or align_cols > i_cols
+
+            if align_rows > i_rows:
+                pad_rows = int(round((align_rows - i_rows) / 2))
+                padding = ((pad_rows, pad_rows), (0, 0))
+            else:
+                pad_cols = int(round((align_cols - i_cols) / 2))
+                padding = ((0, 0), (pad_cols, pad_cols))
+
+            print(padding, self.__pad_type, self.__pad_val)
+            image = np.pad(image, padding, self.__pad_type, constant_values=self.__pad_val)
+
+        return image
+        # return cv2.resize(image, self.__size)
+
+
 class GaborFilter(object):
 
     def __init__(self, size):
@@ -39,35 +73,48 @@ class GaborFilter(object):
             features[i] = cv2.filter2D(image, cv2.CV_8UC3, self.__kernels[i])
         return features
 
+if __name__ == '__main__':
 
-def gabor_feature(image):
-    res = GaborFilter(image.shape).filter(image)
-    plt.subplot(3, 1, 1)
-    plt.imshow(image, cmap='gray')
-    for i in range(len(res)):
-        plt.subplot(3, 4, 5 + i)
-        plt.title(i * 180./8.)
-        plt.imshow(res[i], cmap='gray')
-    plt.show()
-
-
-def binary(image):
-    plt.subplot(3, 1, 1)
-    plt.imshow(image, cmap='gray')
-    plt.subplot(3, 2, 3)
-    plt.imshow(BinaryFilter().filter(image), cmap='gray')
-    plt.subplot(3, 2, 4)
-    plt.imshow(BinaryFilter(inverse=True).filter(image), cmap='gray')
-    plt.subplot(3, 2, 5)
-    plt.imshow(BinaryFilter(otsu=True).filter(image), cmap='gray')
-    plt.subplot(3, 2, 6)
-    plt.imshow(BinaryFilter(otsu=True, inverse=True).filter(image), cmap='gray')
-    plt.show()
+    def gabor_feature(image):
+        res = GaborFilter(image.shape).filter(image)
+        plt.subplot(3, 1, 1)
+        plt.imshow(image, cmap='gray')
+        for i in range(len(res)):
+            plt.subplot(3, 4, 5 + i)
+            plt.title(i * 180./8.)
+            plt.imshow(res[i], cmap='gray')
+        plt.show()
 
 
-for ch, img in CasiaFile('1001-c.gnt'):
-    gabor_feature(img)
-    break
+    def binary(image):
+        plt.subplot(3, 1, 1)
+        plt.imshow(image, cmap='gray')
+        plt.subplot(3, 2, 3)
+        plt.imshow(BinaryFilter().filter(image), cmap='gray')
+        plt.subplot(3, 2, 4)
+        plt.imshow(BinaryFilter(inverse=True).filter(image), cmap='gray')
+        plt.subplot(3, 2, 5)
+        plt.imshow(BinaryFilter(otsu=True).filter(image), cmap='gray')
+        plt.subplot(3, 2, 6)
+        plt.imshow(BinaryFilter(otsu=True, inverse=True).filter(image), cmap='gray')
+        plt.show()
+
+    def resize(image):
+        plt.subplot(2, 1, 1)
+        plt.imshow(image, cmap='gray')
+        plt.subplot(2, 3, 4)
+        plt.imshow(AlignFilter((150, 150)).filter(image), cmap='gray')
+        plt.subplot(2, 3, 5)
+        plt.imshow(AlignFilter((50, 50)).filter(image), cmap='gray')
+        plt.subplot(2, 3, 6)
+        plt.imshow(AlignFilter((50, 150)).filter(image), cmap='gray')
+        plt.show()
+
+
+    for ch, img in CasiaFile('1001-c.gnt'):
+        # gabor_feature(img)
+        resize(img)
+        break
 
 
 
