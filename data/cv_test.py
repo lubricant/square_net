@@ -24,14 +24,11 @@ class BinaryFilter(object):
 
 class AlignFilter(object):
 
-    def __init__(self, size, pad_type='constant', pad_val=0):
-        assert pad_type or len(size) == 2
+    def __init__(self, size, mode='constant', **args):
+        assert mode or len(size) == 2
         self.__size = size
-        self.__pad_type = pad_type
-        self.__pad_val = pad_val
-
-        if isinstance(pad_val, (int, float)):
-            self.__pad_val = ((pad_val, pad_val), (pad_val, pad_val))
+        self.__mode = mode
+        self.__args = args
 
     def filter(self, image):
         rows, cols = self.__size
@@ -49,11 +46,9 @@ class AlignFilter(object):
                 pad_cols = int(round((align_cols - i_cols) / 2))
                 padding = ((0, 0), (pad_cols, pad_cols))
 
-            print(padding, self.__pad_type, self.__pad_val)
-            image = np.pad(image, padding, self.__pad_type, constant_values=self.__pad_val)
+            image = np.pad(image, padding, self.__mode, **self.__args)
 
-        return image
-        # return cv2.resize(image, self.__size)
+        return cv2.resize(image, (cols, rows))
 
 
 class GaborFilter(object):
@@ -103,11 +98,11 @@ if __name__ == '__main__':
         plt.subplot(2, 1, 1)
         plt.imshow(image, cmap='gray')
         plt.subplot(2, 3, 4)
-        plt.imshow(AlignFilter((150, 150)).filter(image), cmap='gray')
+        plt.imshow(AlignFilter((150, 150), constant_values=255).filter(image), cmap='gray')
         plt.subplot(2, 3, 5)
-        plt.imshow(AlignFilter((50, 50)).filter(image), cmap='gray')
+        plt.imshow(AlignFilter((40, 50), constant_values=255).filter(image), cmap='gray')
         plt.subplot(2, 3, 6)
-        plt.imshow(AlignFilter((50, 150)).filter(image), cmap='gray')
+        plt.imshow(AlignFilter((50, 150), constant_values=255).filter(image), cmap='gray')
         plt.show()
 
 
