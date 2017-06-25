@@ -25,7 +25,7 @@ class BinaryFilter(object):
 class AlignFilter(object):
 
     def __init__(self, size, mode='constant', **args):
-        assert mode or len(size) == 2
+        assert mode and len(size) == 2
         self.__size = size
         self.__mode = mode
         self.__args = args

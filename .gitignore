@@ -105,3 +105,4 @@ ENV/
 /data/mnist
 /data/tmp
 /data/casia
+/data/tfrecord
