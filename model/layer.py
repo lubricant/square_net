@@ -25,20 +25,22 @@ def data(name, shape, elem=tf.float16):
 
 
 def loss(name):
-    tf.nn.softmax_cross_entropy_with_logits()
-    tf.nn.softmax_cross_entropy_with_logits()
-    pass
+    return lambda logits, labels: tf.nn.softmax_cross_entropy_with_logits(logits, labels, name=name)
 
 
 def convolution(name, k_shape, stride=1, padding='SAME'):
     __assert_type(name, str)
     __assert_type(stride, int)
     __assert_value(padding.upper(), 'VALID', 'SAME')
-    __assert_shape(k_shape, 4)  # k_height, k_width, in_channel, out_channel = k_shape
+    __assert_shape(k_shape, 3)  # k_height, k_width, out_channel = k_shape
 
     def __(value):
+
+        k_height, k_width, out_channel = k_shape
+        in_channel = value.shape[-1]
+
         with tf.variable_scope(name):
-            rand = tf.random_normal(k_shape, stddev=1. / np.sqrt(np.sum(k_shape)))
+            rand = tf.random_normal([k_height, k_width, in_channel, out_channel], stddev=1. / np.sqrt(np.sum(k_shape)))
             filt = tf.Variable(rand, name='filt')
             conv = tf.nn.conv2d(value, filt, [stride]*4, padding.upper())
             bias = tf.Variable(tf.zeros(conv.shape[-1]), name='bias')
