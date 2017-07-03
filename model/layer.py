@@ -85,30 +85,70 @@ def normalization(name):
     return lambda value: tf.nn.local_response_normalization(value, name=name)
 
 
-def inception(name, reduce, depth):
+def inception(name, *graph):
+    assert graph and \
+           all(isinstance(x, list) for x in graph) and \
+           all(all(isinstance(x, tuple) and len(x) == 2 for x in pipeline) for pipeline in graph)
 
-    __assert_shape(reduce, 2)
-    __assert_shape(depth, 4)
-
-    reduce_3x3, reduce_5x5 = reduce
-    depth_1x1, depth_3x3, depth_5x5, depth_pool = depth
+    node_factory = {
+        'conv_1x1':
+            lambda in_ch, out_ch, value: convolution('conv_1x1', [3, 3, in_ch, out_ch])(value),
+        'conv_3x3':
+            lambda in_ch, out_ch, value: convolution('conv_3x3', [5, 5, in_ch, out_ch])(value),
+        'conv_5x5':
+            lambda in_ch, out_ch, value: convolution('conv_1x1', [5, 5, in_ch, out_ch])(value),
+        'conv_1x7':
+            lambda in_ch, out_ch, value: convolution('conv_1x7', [1, 7, in_ch, out_ch])(value),
+        'conv_7x1':
+            lambda in_ch, out_ch, value: convolution('conv_7x1', [7, 1, in_ch, out_ch])(value),
+        'pool_3x3':
+            lambda in_ch, out_ch, value: pooling('pool_3x3', [3, 3], 'MAX')(
+                convolution('pool_proj', [1, 1, in_ch, out_ch])(value)),
+    }
 
     def __(value):
 
-        __assert_shape(value.shape, 4)  # batch, height, width, channel = shape
-
         with tf.name_scope(name):
-            v_depth = value.shape[-1]
 
-            conv_1x1 = convolution('conv_1x1', [1, 1, v_depth, depth_1x1])(value)
+            node_stack = []
+            for pipeline in graph:
+                node = value
+                for node_type, node_depth in pipeline:
+                    assert node_type in node_factory
+                    in_ch, out_ch = node.shape[-1], node_depth
+                    node = node_factory[node_type](in_ch, out_ch, node)
+                node_stack += node
 
-            conv_reduce_3x3 = convolution('reduce_3x3', [1, 1, v_depth, reduce_3x3])(value)
-            conv_3x3 = convolution('conv_3x3', [3, 3, reduce_3x3, depth_3x3])(conv_reduce_3x3)
+            return tf.concat(node_stack, axis=-1, name='depth_concat')
 
-            conv_reduce_5x5 = convolution('reduce_5x5', [1, 1, v_depth, reduce_5x5])(value)
-            conv_5x5 = convolution('conv_5x5', [5, 5, reduce_5x5, depth_5x5])(conv_reduce_5x5)
+    return __
 
-            pool_3x3 = pooling('pool_3x3', [3, 3], 'MAX')(value)
-            conv_pool_proj = convolution('pool_proj', [1, 1, v_depth, depth_pool])(pool_3x3)
-
-            return tf.concat([conv_1x1, conv_3x3, conv_5x5, conv_pool_proj], axis=-1, name='depth_concat')
+# def inception(name, reduce, depth):
+#
+#     __assert_shape(reduce, 2)
+#     __assert_shape(depth, 4)
+#
+#     reduce_3x3, reduce_5x5 = reduce
+#     depth_1x1, depth_3x3, depth_5x5, depth_pool = depth
+#
+#     def __(value):
+#
+#         __assert_shape(value.shape, 4)  # batch, height, width, channel = shape
+#
+#         ('conv_1x1', 'conv_3x3', 'conv_5x5', 'conv_7x7', 'pool_3x3')
+#
+#         with tf.name_scope(name):
+#             v_depth = value.shape[-1]
+#
+#             conv_1x1 = convolution('conv_1x1', [1, 1, v_depth, depth_1x1])(value)
+#
+#             conv_reduce_3x3 = convolution('reduce_3x3', [1, 1, v_depth, reduce_3x3])(value)
+#             conv_3x3 = convolution('conv_3x3', [3, 3, reduce_3x3, depth_3x3])(conv_reduce_3x3)
+#
+#             conv_reduce_5x5 = convolution('reduce_5x5', [1, 1, v_depth, reduce_5x5])(value)
+#             conv_5x5 = convolution('conv_5x5', [5, 5, reduce_5x5, depth_5x5])(conv_reduce_5x5)
+#
+#             pool_3x3 = pooling('pool_3x3', [3, 3], 'MAX')(value)
+#             conv_pool_proj = convolution('pool_proj', [1, 1, v_depth, depth_pool])(pool_3x3)
+#
+#             return tf.concat([conv_1x1, conv_3x3, conv_5x5, conv_pool_proj], axis=-1, name='depth_concat')
