@@ -2,10 +2,10 @@ import numpy as np
 import tensorflow as tf
 
 
-def __assert_shape(shape, dim):
+def __assert_shape(shape, *dim):
     assert isinstance(shape, (list, tuple)) and \
            all(x is None or isinstance(x, int) for x in shape) and \
-           len(shape) == dim
+           len(shape) in dim
 
 
 def __assert_value(value, *args):
@@ -16,16 +16,16 @@ def __assert_type(value, *args):
     assert isinstance(value, args)
 
 
-def data(name, shape, elem=tf.float16):
+def data(name, shape, elem=tf.float32):
     __assert_type(name, str)
-    __assert_shape(shape, 4)  # batch, height, width, channel = shape
+    __assert_shape(shape, 1, 2, 4)  # [batch, height, width, channel] [batch, label] [batch] = shape
     __assert_value(elem, tf.float16, tf.float32, tf.float64, tf.int8, tf.int16, tf.int32, tf.int64)
 
-    return lambda _=None: tf.placeholder(elem, shape, name)
+    return tf.placeholder(elem, shape, name)
 
 
 def loss(name):
-    return lambda logits, labels: tf.nn.softmax_cross_entropy_with_logits(logits, labels, name=name)
+    return lambda logits, labels: tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=labels, name=name)
 
 
 def convolution(name, k_shape, stride=1, padding='SAME'):
@@ -37,7 +37,7 @@ def convolution(name, k_shape, stride=1, padding='SAME'):
     def __(value):
 
         k_height, k_width, out_channel = k_shape
-        in_channel = value.shape[-1]
+        in_channel = value.shape.as_list()[-1]
 
         with tf.variable_scope(name):
             rand = tf.random_normal([k_height, k_width, in_channel, out_channel], stddev=1. / np.sqrt(np.sum(k_shape)))
@@ -56,12 +56,27 @@ def pooling(name, p_shape, p_type, stride=1, padding='SAME'):
     __assert_type(stride, int)
     __assert_value(p_type.upper(), 'MAX', 'AVG')
     __assert_value(padding.upper(), 'VALID', 'SAME')
-    __assert_shape(p_shape, 2)  # p_height, p_width = p_shape
+    __assert_shape(p_shape, 2, 3)  # p_height, p_width[, p_depth] = p_shape
 
-    p_shape = [1] + p_shape + [1]
-    stride = [1, stride, stride, 1]
-    pool = tf.nn.max_pool if p_type.upper() == 'MAX' else tf.nn.avg_pool
-    return lambda value: pool(value, p_shape, stride, padding.upper(), name=name)
+    if len(p_shape) == 2:
+        p_shape = [1] + p_shape + [1]
+        stride = [1, stride, stride, 1]
+        p_func = tf.nn.max_pool if p_type.upper() == 'MAX' else tf.nn.avg_pool
+        return lambda value: p_func(value, p_shape, stride, padding.upper(), name=name)
+
+    def __(value):
+        v_depth = value.shape.as_list()[-1]
+        p_height, p_width, p_depth = p_shape
+        assert p_depth == v_depth * 2
+
+        with tf.variable_scope(name):
+            conv = convolution('conv', [p_height, p_width, p_depth-v_depth],
+                               stride=stride, padding=padding)(value)
+            pool = pooling('pool', [p_height, p_width], p_type=p_type,
+                           stride=stride, padding=padding)(value)
+            return tf.concat([conv, pool], axis=-1, name='depth_concat')
+
+    return __
 
 
 def density(name, neurons):
@@ -94,18 +109,18 @@ def inception(name, *graph):
 
     node_factory = {
         'conv_1x1':
-            lambda in_ch, out_ch, value: convolution('conv_1x1', [3, 3, in_ch, out_ch])(value),
+            lambda depth, value: convolution('conv_1x1', [3, 3, depth])(value),
         'conv_3x3':
-            lambda in_ch, out_ch, value: convolution('conv_3x3', [5, 5, in_ch, out_ch])(value),
+            lambda depth, value: convolution('conv_3x3', [5, 5, depth])(value),
         'conv_5x5':
-            lambda in_ch, out_ch, value: convolution('conv_1x1', [5, 5, in_ch, out_ch])(value),
+            lambda depth, value: convolution('conv_1x1', [5, 5, depth])(value),
         'conv_1x7':
-            lambda in_ch, out_ch, value: convolution('conv_1x7', [1, 7, in_ch, out_ch])(value),
+            lambda depth, value: convolution('conv_1x7', [1, 7, depth])(value),
         'conv_7x1':
-            lambda in_ch, out_ch, value: convolution('conv_7x1', [7, 1, in_ch, out_ch])(value),
+            lambda depth, value: convolution('conv_7x1', [7, 1, depth])(value),
         'pool_3x3':
-            lambda in_ch, out_ch, value: pooling('pool_3x3', [3, 3], 'MAX')(
-                convolution('pool_proj', [1, 1, in_ch, out_ch])(value)),
+            lambda depth, value: pooling('pool_3x3', [3, 3], 'MAX')(
+                convolution('pool_proj', [1, 1, depth])(value)),
     }
 
     def __(value):
@@ -117,9 +132,8 @@ def inception(name, *graph):
                 node = value
                 for node_type, node_depth in pipeline:
                     assert node_type in node_factory
-                    in_ch, out_ch = node.shape[-1], node_depth
-                    node = node_factory[node_type](in_ch, out_ch, node)
-                node_stack += node
+                    node = node_factory[node_type](node_depth, node)
+                node_stack.append(node)
 
             return tf.concat(node_stack, axis=-1, name='depth_concat')
 

@@ -1,12 +1,6 @@
 import model.layer as layer
 
 
-class HccrGoogLeNet(object):
-
-    def __init__(self):
-        pass
-
-
 image = layer.data('Input', [None, 120, 120, 1])
 label = layer.data('Label', [None])
 
