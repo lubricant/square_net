@@ -1,8 +1,10 @@
+
+import tensorflow as tf
 import model.layer as layer
 
 
 image = layer.data('Input', [None, 120, 120, 1])
-label = layer.data('Label', [None])
+label = layer.data('Label', [None], tf.int32)
 
 conv1 = layer.convolution('Conv_7x7x64', [7, 7, 64], 2)(image)
 pool1 = layer.pooling('MaxPool_3x3', [3, 3], 'MAX', stride=2)(conv1)

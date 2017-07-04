@@ -16,19 +16,30 @@ def __assert_type(value, *args):
     assert isinstance(value, args)
 
 
-def data(name, shape, elem=tf.float32):
+def data(name, shape, dtype=tf.float32):
     __assert_type(name, str)
-    __assert_shape(shape, 1, 2, 4)  # [batch, height, width, channel] [batch, label] [batch] = shape
-    __assert_value(elem, tf.float16, tf.float32, tf.float64, tf.int8, tf.int16, tf.int32, tf.int64)
+    __assert_shape(shape, 1, 2, 4)  # [batch, height, width, channel] [batch, num_classes] [batch] = shape
+    __assert_value(dtype, tf.float16, tf.float32, tf.float64, tf.int8, tf.int16, tf.int32, tf.int64)
 
-    return tf.placeholder(elem, shape, name)
+    return tf.placeholder(dtype, shape, name)
 
 
 def loss(name):
-    return lambda logits, labels: tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=labels, name=name)
+
+    def __(logits, labels):
+        __assert_shape(logits.shape.as_list(), 2)  # batch_size, num_classes = logits.shape
+        __assert_shape(labels.shape.as_list(), 1, 2)
+
+        l_func = (tf.nn.softmax_cross_entropy_with_logits  # batch_size, num_classes = labels.shape
+                  if len(labels.shape) == 2 else
+                  tf.nn.sparse_softmax_cross_entropy_with_logits)  # batch_size = labels.shape
+
+        return l_func(logits=logits, labels=labels, name=name)
+
+    return __
 
 
-def convolution(name, k_shape, stride=1, padding='SAME'):
+def convolution(name, k_shape, stride=1, padding='SAME', dtype=tf.float32):
     __assert_type(name, str)
     __assert_type(stride, int)
     __assert_value(padding.upper(), 'VALID', 'SAME')
@@ -40,7 +51,9 @@ def convolution(name, k_shape, stride=1, padding='SAME'):
         in_channel = value.shape.as_list()[-1]
 
         with tf.variable_scope(name):
-            rand = tf.random_normal([k_height, k_width, in_channel, out_channel], stddev=1. / np.sqrt(np.sum(k_shape)))
+            shape = [k_height, k_width, in_channel, out_channel]
+            rand = tf.random_normal(shape, stddev=1. / np.sqrt(np.sum(shape)), dtype=dtype)
+
             filt = tf.Variable(rand, name='filt')
             conv = tf.nn.conv2d(value, filt, [stride]*4, padding.upper())
             bias = tf.Variable(tf.zeros(conv.shape[-1]), name='bias')
@@ -79,7 +92,7 @@ def pooling(name, p_shape, p_type, stride=1, padding='SAME'):
     return __
 
 
-def density(name, neurons):
+def density(name, neurons, dtype=tf.float32):
     __assert_type(name, str)
     __assert_type(neurons, int)
 
@@ -88,7 +101,7 @@ def density(name, neurons):
             value = tf.reshape(value, [-1, np.prod(value.shape[1:].as_list())])
 
             shape = value.shape[1:].as_list() + [neurons]
-            rand = tf.random_normal(shape, stddev=1. / np.sqrt(np.sum(shape)))
+            rand = tf.random_normal(shape, stddev=1. / np.sqrt(np.sum(shape)), dtype=dtype)
 
             weight = tf.Variable(rand, name='weight')
             bias = tf.Variable(tf.zeros([neurons]), name='bias')
@@ -102,25 +115,25 @@ def normalization(name):
     return lambda value: tf.nn.local_response_normalization(value, name=name)
 
 
-def inception(name, *graph):
+def inception(name, *graph, dtype=tf.float32):
     assert graph and \
            all(isinstance(x, list) for x in graph) and \
            all(all(isinstance(x, tuple) and len(x) == 2 for x in pipeline) for pipeline in graph)
 
     node_factory = {
         'conv_1x1':
-            lambda depth, value: convolution('conv_1x1', [3, 3, depth])(value),
+            lambda depth, value: convolution('conv_1x1', [3, 3, depth], padding='SAME', dtype=dtype)(value),
         'conv_3x3':
-            lambda depth, value: convolution('conv_3x3', [5, 5, depth])(value),
+            lambda depth, value: convolution('conv_3x3', [5, 5, depth], padding='SAME', dtype=dtype)(value),
         'conv_5x5':
-            lambda depth, value: convolution('conv_1x1', [5, 5, depth])(value),
+            lambda depth, value: convolution('conv_1x1', [5, 5, depth], padding='SAME', dtype=dtype)(value),
         'conv_1x7':
-            lambda depth, value: convolution('conv_1x7', [1, 7, depth])(value),
+            lambda depth, value: convolution('conv_1x7', [1, 7, depth], padding='SAME', dtype=dtype)(value),
         'conv_7x1':
-            lambda depth, value: convolution('conv_7x1', [7, 1, depth])(value),
+            lambda depth, value: convolution('conv_7x1', [7, 1, depth], padding='SAME', dtype=dtype)(value),
         'pool_3x3':
             lambda depth, value: pooling('pool_3x3', [3, 3], 'MAX')(
-                convolution('pool_proj', [1, 1, depth])(value)),
+                convolution('pool_proj', [1, 1, depth], padding='SAME', dtype=dtype)(value)),
     }
 
     def __(value):
