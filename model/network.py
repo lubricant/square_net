@@ -10,78 +10,63 @@ class SquareNet(object):
     network = object()
 
     def __init__(self):
-        self.__init_flags()
         self.__build_network()
         self.__build_summary()
-
-    def __init_flags(self):
-        flags = tf.app.flags
-        flags.DEFINE_integer('max_steps', 1000, 'Number of steps to run trainer.')
-        flags.DEFINE_integer('max_steps', 1000, 'Number of steps to run trainer.')
-        flags.DEFINE_float('learning_rate', 0.001, 'Initial learning rate.')
-        flags.DEFINE_float('dropout', 0.9, 'Keep probability for training dropout.')
-        flags.DEFINE_string('data_dir', '/tmp/data', 'Directory for storing data')
-        flags.DEFINE_string('summaries_dir', '/tmp/mnist_logs', 'Summaries directory')
 
     def __build_network(self):
         assert not tf.get_variable_scope().original_name_scope
 
-        net = dict()
+        self.image = layer.data('Input', [None, 120, 120, 1])
+        self.label = layer.data('Label', [None], tf.int32)
 
-        image = net['image'] = layer.data('Input', [None, 120, 120, 1])
-        label = net['label'] = layer.data('Label', [None], tf.int32)
+        self.conv1 = layer.convolution('Conv_7x7x64', [7, 7, 64], 2)(self.image)
+        self.pool1 = layer.pooling('MaxPool_3x3', [3, 3], 'MAX', stride=2)(self.conv1)
+        self.norm1 = layer.normalization('LocalRespNorm')(self.pool1)
 
-        conv1 = net['conv1'] = layer.convolution('Conv_7x7x64', [7, 7, 64], 2)(image)
-        pool1 = net['pool1'] = layer.pooling('MaxPool_3x3', [3, 3], 'MAX', stride=2)(conv1)
-        norm1 = net['norm1'] = layer.normalization('LocalRespNorm')(pool1)
+        self.conv2 = layer.convolution('Conv_1x1x64', [1, 1, 64])(self.norm1)
+        self.conv3 = layer.convolution('Conv_3x3x192', [3, 3, 192])(self.conv2)
+        self.norm2 = layer.normalization('LocalRespNorm')(self.conv3)
+        self.pool2 = layer.pooling('MaxPool_3x3', [3, 3], 'MAX', stride=2)(self.norm2)
 
-        conv2 = net['conv2'] = layer.convolution('Conv_1x1x64', [1, 1, 64])(norm1)
-        conv3 = net['conv3'] = layer.convolution('Conv_3x3x192', [3, 3, 192])(conv2)
-        norm2 = net['norm2'] = layer.normalization('LocalRespNorm')(conv3)
-        pool2 = net['pool2'] = layer.pooling('MaxPool_3x3', [3, 3], 'MAX', stride=2)(norm2)
+        self.incp1 = layer.inception('Inception_v1',
+                                     [('pool_3x3', 32)],
+                                     [('conv_1x1', 64)],
+                                     [('conv_1x1', 96), ('conv_3x3', 128)],
+                                     [('conv_1x1', 16), ('conv_5x5', 32)])(self.pool2)
 
-        incp1 = net['incp1'] = layer.inception('Inception_v1',
-                                               [('pool_3x3', 32)],
-                                               [('conv_1x1', 64)],
-                                               [('conv_1x1', 96), ('conv_3x3', 128)],
-                                               [('conv_1x1', 16), ('conv_5x5', 32)])(pool2)
+        self.incp2 = layer.inception('Inception_v1',
+                                     [('pool_3x3', 64)],
+                                     [('conv_1x1', 128)],
+                                     [('conv_1x1', 128), ('conv_3x3', 192)],
+                                     [('conv_1x1', 32), ('conv_5x5', 96)])(self.incp1)
 
-        incp2 = net['incp2'] = layer.inception('Inception_v1',
-                                               [('pool_3x3', 64)],
-                                               [('conv_1x1', 128)],
-                                               [('conv_1x1', 128), ('conv_3x3', 192)],
-                                               [('conv_1x1', 32), ('conv_5x5', 96)])(incp1)
+        self.pool3 = layer.pooling('MaxPool_3x3', [3, 3], 'MAX', stride=2)(self.incp2)
 
-        pool3 = net['pool3'] = layer.pooling('MaxPool_3x3', [3, 3], 'MAX', stride=2)(incp2)
+        self.incp3 = layer.inception('Inception_v1',
+                                     [('pool_3x3', 64)],
+                                     [('conv_1x1', 160)],
+                                     [('conv_1x1', 112), ('conv_3x3', 224)],
+                                     [('conv_1x1', 24), ('conv_5x5', 64)])(self.pool3)
 
-        incp3 = net['incp3'] = layer.inception('Inception_v1',
-                                               [('pool_3x3', 64)],
-                                               [('conv_1x1', 160)],
-                                               [('conv_1x1', 112), ('conv_3x3', 224)],
-                                               [('conv_1x1', 24), ('conv_5x5', 64)])(pool3)
+        self.incp4 = layer.inception('Inception_v1',
+                                     [('pool_3x3', 128)],
+                                     [('conv_1x1', 256)],
+                                     [('conv_1x1', 160), ('conv_3x3', 320)],
+                                     [('conv_1x1', 32), ('conv_5x5', 128)])(self.incp3)
 
-        incp4 = net['incp4'] = layer.inception('Inception_v1',
-                                               [('pool_3x3', 128)],
-                                               [('conv_1x1', 256)],
-                                               [('conv_1x1', 160), ('conv_3x3', 320)],
-                                               [('conv_1x1', 32), ('conv_5x5', 128)])(incp3)
+        self.pool4 = layer.pooling('MaxPool_3x3', [5, 5], 'MAX', stride=3)(self.incp4)
+        self.conv4 = layer.convolution('Conv_1x1x128', [1, 1, 128])(self.pool4)
+        self.fc = layer.density('FC_1024', 1024)(self.conv4)
 
-        pool4 = net['pool4'] = layer.pooling('MaxPool_3x3', [5, 5], 'MAX', stride=3)(incp4)
-        conv4 = net['conv4'] = layer.convolution('Conv_1x1x128', [1, 1, 128])(pool4)
-        fc = net['fc'] = layer.density('FC_1024', 1024)(conv4)
-
-        loss = net['loss'] = layer.loss('Softmax')(fc, label)
-        net['loss_sum'] = tf.reduce_sum(loss)
-        net['loss_mean'] = tf.reduce_mean(loss)
-
-        [setattr(self.network, attr, net[attr]) for attr in net]
+        self.loss = layer.loss('Softmax')(self.fc, self.label)
+        self.loss_sum = tf.reduce_sum(self.loss)
+        self.loss_mean = tf.reduce_mean(self.loss)
 
     def __build_summary(self):
 
-        tf.summary.scalar('loss_sum', self.network.loss_sum)
-        tf.summary.scalar('loss_mean', self.network.loss_mean)
-
-        setattr(self.network, 'summary', tf.summary.merge_all())
+        tf.summary.scalar('loss_sum', self.loss_sum)
+        tf.summary.scalar('loss_mean', self.loss_mean)
+        self.summary = tf.summary.merge_all()
 
     def restore_network(self, sess, path):
         saver = tf.train.Saver()
@@ -93,16 +78,19 @@ class SquareNet(object):
 
     def write_summary(self, sess, path):
         writer = tf.summary.FileWriter(path)
-        writer.add_summary(self.network.summary)
+        writer.add_summary(self.summary)
 
 
 model.init_flags()
+config = tf.app.flags.FLAGS
 
 image_batch, label_batch = data.tf_queue()
 network = SquareNet()
+optimizer = tf.train.GradientDescentOptimizer(learning_rate=config.learning_rate)
 
+global_step = tf.Variable(0, name='global_step', trainable=False)
+train_op = optimizer.minimize(network.loss, global_step=global_step)
 init_op = tf.initialize_all_variables()
-
 
 with tf.Session() as sess:
     sess.run(init_op)
@@ -113,8 +101,12 @@ with tf.Session() as sess:
         # while not coord.should_stop():
         while True:
             images, labels = sess.run([image_batch, label_batch])
-            print(images)
-            print(labels)
+            result = sess.run([train_op, network.loss_mean, network.loss_sum],
+                              feed_dict={network.image: images, network.label: labels})
+
+            _, loss_mean, loss_sum = result
+            # print(images)
+            # print(labels)
     except tf.errors.OutOfRangeError:
         print('Done reading')
     finally:
