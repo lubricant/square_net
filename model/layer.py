@@ -52,7 +52,9 @@ def convolution(name, k_shape, stride=1, padding='SAME', dtype=tf.float32):
 
         with tf.variable_scope(name):
             shape = [k_height, k_width, in_channel, out_channel]
-            rand = tf.random_normal(shape, stddev=1. / np.sqrt(np.sum(shape)), dtype=dtype)
+            fan_in, fan_out = np.prod(shape[:-1]), np.prod(k_shape)
+            bound = np.sqrt(6. / (fan_in + fan_out))
+            rand = tf.random_uniform(shape, minval=-bound, maxval=bound, dtype=dtype)
 
             filt = tf.Variable(rand, name='filt')
             conv = tf.nn.conv2d(value, filt, [stride]*4, padding.upper())
@@ -101,7 +103,9 @@ def density(name, neurons, dtype=tf.float32):
             value = tf.reshape(value, [-1, np.prod(value.shape[1:].as_list())])
 
             shape = value.shape[1:].as_list() + [neurons]
-            rand = tf.random_normal(shape, stddev=1. / np.sqrt(np.sum(shape)), dtype=dtype)
+            fan_in, fan_out = value.shape.as_list()[-1], neurons
+            bound = np.sqrt(6. / (fan_in + fan_out))
+            rand = tf.random_uniform(shape, minval=-bound, maxval=bound, dtype=dtype)
 
             weight = tf.Variable(rand, name='weight')
             bias = tf.Variable(tf.zeros([neurons]), name='bias')
