@@ -99,7 +99,10 @@ class SquareNet(object):
 model.init_flags()
 
 image_batch, label_batch = data.tf_queue()
+network = SquareNet()
+
 init_op = tf.initialize_all_variables()
+
 
 with tf.Session() as sess:
     sess.run(init_op)
