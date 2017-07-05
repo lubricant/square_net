@@ -41,6 +41,65 @@ def ensure_path(path):
     os.mkdir(get_path(path))
 
 
+def ch_dict(refresh=False):
+
+    def generate_dict():
+        ch_mapping, idx_mapping, ch_idx = {}, {}, 0
+        for name in list_file('casia'):
+            for ch, _ in CasiaFile(name):
+                if ch not in ch_map:
+                    ch_mapping[ch_idx] = ch
+                    idx_mapping[ch] = ch_idx
+                    ch_idx += 1
+        return [ch_mapping, idx_mapping]
+
+    dict_file = 'tmp/ch_dict.npy'
+    if refresh or not exist_path(dict_file):
+        np.save(get_path(dict_file), generate_dict())
+
+    ch_map, idx_map = np.load(dict_file)
+    # g_ch_map, g_idx_map = generate_dict()
+    # assert not any(True for k in ch_map if (
+    #     k not in g_ch_map or ch_map[k] != g_ch_map[k]))
+    # assert not any(True for k in idx_map if (
+    #     k not in g_idx_map or idx_map[k] != g_idx_map[k]))
+    return ch_map, idx_map
+
+
+def tf_queue(shuffle_queue=True):
+
+    filename_queue = tf.train.string_input_producer([
+        get_path('tfrecord/' + f) for f in list_file('tfrecord')])
+
+    _, serialized_example = tf.TFRecordReader().read(filename_queue)
+    features = tf.parse_single_example(
+        serialized_example,
+        features={
+            'index': tf.FixedLenFeature([], tf.int64),
+            'shape': tf.FixedLenFeature([2], tf.int64),
+            'image': tf.FixedLenFeature([], tf.string)})
+
+    if not shuffle_queue:  # only for test
+        idx = tf.cast(features['index'], tf.int32)
+        img = tf.reshape(tf.decode_raw(features['image'], tf.uint8),
+                         tf.cast(features['shape'], tf.int32))
+        return img, idx
+
+    config = tf.app.flags.FLAGS
+    batch_size = config.batch_size
+    image_width, image_height = config.image_width, config.image_height
+    assert batch_size and image_height and image_width
+
+    labels = tf.cast(features['index'], tf.int32)
+    images = tf.reshape(tf.decode_raw(features['image'], tf.uint8), [image_height, image_width])
+    rand_data_queue = tf.train.shuffle_batch([images, labels],
+                                             batch_size=batch_size,
+                                             capacity=batch_size * 5,
+                                             min_after_dequeue=batch_size,
+                                             num_threads=2)
+    return rand_data_queue
+
+
 class MnistFile(object):
 
     '''
@@ -163,56 +222,12 @@ class TFRecordFile(object):
             self.__tfwriter.close()
             self.__tfwriter = None
 
-    @staticmethod
-    def ch_dict(refresh=False):
-
-        def generate_dict():
-            ch_mapping, idx_mapping, ch_idx = {}, {}, 0
-            for name in list_file('casia'):
-                for ch, _ in CasiaFile(name):
-                    if ch not in ch_map:
-                        ch_mapping[ch_idx] = ch
-                        idx_mapping[ch] = ch_idx
-                        ch_idx += 1
-            return [ch_mapping, idx_mapping]
-
-        dict_file = 'tmp/ch_dict.npy'
-        if refresh or not exist_path(dict_file):
-            np.save(get_path(dict_file), generate_dict())
-
-        ch_map, idx_map = np.load(dict_file)
-        # g_ch_map, g_idx_map = generate_dict()
-        # assert not any(True for k in ch_map if (
-        #     k not in g_ch_map or ch_map[k] != g_ch_map[k]))
-        # assert not any(True for k in idx_map if (
-        #     k not in g_idx_map or idx_map[k] != g_idx_map[k]))
-        return ch_map, idx_map
-
-    @staticmethod
-    def tf_queue():
-        filename_queue = tf.train.string_input_producer([
-            get_path('tfrecord/' + f) for f in list_file('tfrecord')])
-
-        _, serialized_example = tf.TFRecordReader().read(filename_queue)
-        features = tf.parse_single_example(
-            serialized_example,
-            features={
-                'index': tf.FixedLenFeature([], tf.int64),
-                'shape': tf.FixedLenFeature([2], tf.int64),
-                'image': tf.FixedLenFeature([], tf.string)})
-
-        idx = tf.cast(features['index'], tf.int32)
-        img = tf.reshape(tf.decode_raw(features['image'], tf.uint8),
-                         tf.cast(features['shape'], tf.int32))
-
-        return img, idx
-
 
 if __name__ == '__main__':
 
-    ch_dict, _ = TFRecordFile.ch_dict()
+    ch_dict, _ = ch_dict()
 
-    image, label = TFRecordFile.tf_queue()
+    image, label = tf_queue(shuffle_queue=False)
     init_op = tf.initialize_all_variables()
     with tf.Session() as sess:
         sess.run(init_op)
