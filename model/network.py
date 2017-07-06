@@ -7,8 +7,6 @@ import model
 
 class SquareNet(object):
 
-    network = object()
-
     def __init__(self):
         self.__build_network()
         self.__build_summary()
@@ -68,17 +66,17 @@ class SquareNet(object):
         tf.summary.scalar('loss_mean', self.loss_mean)
         self.summary = tf.summary.merge_all()
 
-    def restore_network(self, sess, path):
-        saver = tf.train.Saver()
-        saver.restore(sess, path)
-
-    def save_network(self, sess, path):
-        saver = tf.train.Saver()
-        saver.save(sess, path)
-
-    def write_summary(self, sess, path):
-        writer = tf.summary.FileWriter(path)
-        writer.add_summary(self.summary)
+    # def restore_network(self, sess, path):
+    #     saver = tf.train.Saver()
+    #     saver.restore(sess, path)
+    #
+    # def save_network(self, sess, path):
+    #     saver = tf.train.Saver()
+    #     saver.save(sess, path)
+    #
+    # def write_summary(self, sess, path):
+    #     writer = tf.summary.FileWriter(path)
+    #     writer.add_summary(self.summary)
 
 
 model.init_flags()

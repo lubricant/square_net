@@ -68,8 +68,14 @@ def ch_dict(refresh=False):
 
 def tf_queue(shuffle_queue=True):
 
+    flags = tf.app.flags.FLAGS
+
+    data_dir = flags.data_dir
+    thread_num, epoch_num = flags.thread_num, flags.epoch_num
+    batch_size, image_size = flags.batch_size, flags.image_size
+
     filename_queue = tf.train.string_input_producer([
-        get_path('tfrecord/' + f) for f in list_file('tfrecord')])
+        get_path(data_dir + '/' + f) for f in list_file(data_dir)], num_epochs=epoch_num)
 
     _, serialized_example = tf.TFRecordReader().read(filename_queue)
     features = tf.parse_single_example(
@@ -79,24 +85,19 @@ def tf_queue(shuffle_queue=True):
             'shape': tf.FixedLenFeature([2], tf.int64),
             'image': tf.FixedLenFeature([], tf.string)})
 
-    if not shuffle_queue:  # only for test
+    if not shuffle_queue:  # only for unit test !
         idx = tf.cast(features['index'], tf.int32)
         img = tf.reshape(tf.decode_raw(features['image'], tf.uint8),
                          tf.cast(features['shape'], tf.int32))
         return img, idx
 
-    config = tf.app.flags.FLAGS
-    batch_size = config.batch_size
-    image_width, image_height = config.image_width, config.image_height
-    assert batch_size and image_height and image_width
-
     labels = tf.cast(features['index'], tf.int32)
-    images = tf.reshape(tf.decode_raw(features['image'], tf.uint8), [image_height, image_width])
+    images = tf.reshape(tf.decode_raw(features['image'], tf.uint8), [image_size, image_size])
     rand_data_queue = tf.train.shuffle_batch([images, labels],
                                              batch_size=batch_size,
                                              capacity=batch_size * 5,
                                              min_after_dequeue=batch_size,
-                                             num_threads=2)
+                                             num_threads=thread_num)
     return rand_data_queue
 
 
