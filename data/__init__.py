@@ -2,7 +2,6 @@ import inspect
 import os
 import shutil
 
-import numpy as np
 import tensorflow as tf
 
 import data as this
@@ -43,7 +42,7 @@ def label_dict(dict_path='labels_dict.npy'):
     return np.load(get_path(dict_path))
 
 
-def data_queue(exec_mode, batch_size, image_size, epoch_num=None, thread_num=1):
+def data_queue(exec_mode, batch_size, image_size, thread_num=1, epoch_num=None):
 
     assert batch_size > 0 and image_size > 0
 
@@ -77,6 +76,9 @@ def data_queue(exec_mode, batch_size, image_size, epoch_num=None, thread_num=1):
 
 
 if __name__ == '__main__':
+
+    from data.cv_filter import *
+    from data.dt_trans import *
 
     ch_dict, _ = label_dict()
 
@@ -114,7 +116,11 @@ if __name__ == '__main__':
 
             for i in range(50):
                 image, label = sess.run([image_batch, label_batch])
+                batch, each_shape = image.shape[0], image.shape[1:]
                 print([(i, ch_dict[i]) for i in label])
+                print(image.shape, type(image.shape[0]))
+                # gabor_filter = GaborFilter((100, 100))
+                # gabor_part = np.array()
 
             coord.request_stop()
             coord.join(threads)
