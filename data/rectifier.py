@@ -11,12 +11,14 @@ data
 |   |----test： [CASIA 测试集文件 (.gnt)]
 |----mnist：    [MNIST 所有文件] 
 |----record:    [留空]
+|----tmp:       [留空]
 '''
 
 
-def prepare_label_dict(dict_path='labels_dict.npy'):
+def prepare_label_dict(dict_path='tmp/labels_dict.npy'):
     '''
     构建 label 字典文件并以 npy 格式保存
+    生成的字典文件暂时存放在 tmp 目录
     '''
 
     def build_label_mapping(casia_files):
@@ -95,5 +97,5 @@ if __name__ == '__main__':
     # prepare_label_dict()
     # prepare_image_files('training_set.tfr', data_set='TRAINING')
     # prepare_image_files('test_set.tfr', data_set='TEST')
-    prepare_image_files('data_set.tfr', data_set='ALL')
+    prepare_image_files('mixing_set.tfr', data_set='ALL')
 

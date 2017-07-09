@@ -41,30 +41,33 @@ def ensure_path(path):
     os.mkdir(get_path(path))
 
 
-def tf_queue(shuffle_queue=True):
+def label_dict(dict_path='labels_dict.npy'):
+    return np.load(get_path(dict_path))
 
-    flags = tf.app.flags.FLAGS
 
-    data_dir = flags.data_dir
-    thread_num, epoch_num = flags.thread_num, flags.epoch_num
-    batch_size, image_size = flags.batch_size, flags.image_size
+def data_queue(exec_mode, epoch_num, batch_size, image_size, thread_num=1):
 
-    filename_queue = tf.train.string_input_producer([
-        get_path(data_dir + '/' + f) for f in list_file(data_dir)], num_epochs=epoch_num)
+    assert epoch_num > 0 and batch_size > 0 and image_size > 0
+
+    data_set = {
+        'MIXING': 'mixing_set.tfr',
+        'TRAINING': 'training_set.tfr',
+        'TEST': 'test_set.tfr'}
+
+    assert exec_mode and exec_mode.upper() in data_set
+
+    # filename_queue = tf.train.string_input_producer([
+    #     get_path(data_dir + '/' + f) for f in list_file(data_dir)], num_epochs=epoch_num)
+
+    filename_queue = tf.train.string_input_producer(
+        [data_set[exec_mode.upper()]], num_epochs=epoch_num)
 
     _, serialized_example = tf.TFRecordReader().read(filename_queue)
     features = tf.parse_single_example(
         serialized_example,
         features={
             'index': tf.FixedLenFeature([], tf.int64),
-            'shape': tf.FixedLenFeature([2], tf.int64),
             'image': tf.FixedLenFeature([], tf.string)})
-
-    if not shuffle_queue:  # only for unit test !
-        idx = tf.cast(features['index'], tf.int32)
-        img = tf.reshape(tf.decode_raw(features['image'], tf.uint8),
-                         tf.cast(features['shape'], tf.int32))
-        return img, idx
 
     labels = tf.cast(features['index'], tf.int32)
     images = tf.reshape(tf.decode_raw(features['image'], tf.uint8), [image_size, image_size])
@@ -76,21 +79,24 @@ def tf_queue(shuffle_queue=True):
     return rand_data_queue
 
 
-
 if __name__ == '__main__':
 
-    ch_dict, _ = ch_dict()
+    ch_dict, _ = label_dict()
 
-    image, label = tf_queue(shuffle_queue=False)
+    image_batch, label_batch = data_queue(exec_mode='test', batch_size=100, epoch_num=10, image_size=100)
     init_op = tf.initialize_all_variables()
     with tf.Session() as sess:
         sess.run(init_op)
         coord = tf.train.Coordinator()
         threads = tf.train.start_queue_runners(sess=sess, coord=coord)
-        for i in range(1):
-            print('image label:' + ch_dict[label.eval()])
-            plt.imshow(image.eval(), cmap='gray')
-            plt.show()
+
+        image, label = sess.run([image_batch, label_batch])
+        print(image)
+        print(label)
+        # print('image label:' + ch_dict[])
+        # plt.imshow(image.eval(), cmap='gray')
+        # plt.show()
+
 
         coord.request_stop()
         coord.join(threads)
