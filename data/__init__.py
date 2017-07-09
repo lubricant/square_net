@@ -1,11 +1,9 @@
 import inspect
 import os
 import shutil
-import struct
 
 import numpy as np
 import tensorflow as tf
-from matplotlib import pyplot as plt
 
 import data as this
 
@@ -45,22 +43,20 @@ def label_dict(dict_path='labels_dict.npy'):
     return np.load(get_path(dict_path))
 
 
-def data_queue(exec_mode, epoch_num, batch_size, image_size, thread_num=1):
+def data_queue(exec_mode, batch_size, image_size, epoch_num=None, thread_num=1):
 
-    assert epoch_num > 0 and batch_size > 0 and image_size > 0
+    assert batch_size > 0 and image_size > 0
 
     data_set = {
-        'MIXING': 'mixing_set.tfr',
-        'TRAINING': 'training_set.tfr',
-        'TEST': 'test_set.tfr'}
+        'TRAINING': 'record/train',
+        'TEST': 'record/test',
+        'MIXING': 'record/all'}
 
     assert exec_mode and exec_mode.upper() in data_set
 
-    # filename_queue = tf.train.string_input_producer([
-    #     get_path(data_dir + '/' + f) for f in list_file(data_dir)], num_epochs=epoch_num)
-
-    filename_queue = tf.train.string_input_producer(
-        [data_set[exec_mode.upper()]], num_epochs=epoch_num)
+    data_set_dir = data_set[exec_mode.upper()]
+    filename_queue = tf.train.string_input_producer([
+        get_path(data_set_dir + '/' + f) for f in list_file(data_set_dir)], num_epochs=epoch_num)
 
     _, serialized_example = tf.TFRecordReader().read(filename_queue)
     features = tf.parse_single_example(
@@ -71,6 +67,7 @@ def data_queue(exec_mode, epoch_num, batch_size, image_size, thread_num=1):
 
     labels = tf.cast(features['index'], tf.int32)
     images = tf.reshape(tf.decode_raw(features['image'], tf.uint8), [image_size, image_size])
+
     rand_data_queue = tf.train.shuffle_batch([images, labels],
                                              batch_size=batch_size,
                                              capacity=batch_size * 5,
@@ -83,24 +80,46 @@ if __name__ == '__main__':
 
     ch_dict, _ = label_dict()
 
-    image_batch, label_batch = data_queue(exec_mode='test', batch_size=100, epoch_num=10, image_size=100)
-    init_op = tf.initialize_all_variables()
-    with tf.Session() as sess:
-        sess.run(init_op)
-        coord = tf.train.Coordinator()
-        threads = tf.train.start_queue_runners(sess=sess, coord=coord)
+    def test_queue():
+        filename_queue = tf.train.string_input_producer([get_path('record/test/test_set_0.tfr')])
+        _, serialized_example = tf.TFRecordReader().read(filename_queue)
+        features = tf.parse_single_example(
+            serialized_example,
+            features={
+                'index': tf.FixedLenFeature([], tf.int64),
+                'label': tf.FixedLenFeature([], tf.string)})
 
-        image, label = sess.run([image_batch, label_batch])
-        print(image)
-        print(label)
-        # print('image label:' + ch_dict[])
-        # plt.imshow(image.eval(), cmap='gray')
-        # plt.show()
+        label, index = features['label'], features['index']
+        with tf.Session() as sess:
+            sess.run(tf.initialize_all_variables())
+            coord = tf.train.Coordinator()
+            threads = tf.train.start_queue_runners(sess=sess, coord=coord)
+
+            # 使用 eval 执行时，数据之间是乱序的
+            for i in range(5000):
+                print(label.eval().decode('UTF8'), ch_dict[index.eval()])
+
+            coord.request_stop()
+            coord.join(threads)
+
+    def test_rand_queue():
+        image_batch, label_batch = data_queue(exec_mode='test', batch_size=100, image_size=100, epoch_num=1)
+        init_op = tf.group(tf.initialize_all_variables(),
+                           tf.initialize_local_variables())
+        with tf.Session() as sess:
+            sess.run(init_op)
+
+            coord = tf.train.Coordinator()
+            threads = tf.train.start_queue_runners(sess=sess, coord=coord)
+
+            for i in range(50):
+                image, label = sess.run([image_batch, label_batch])
+                print([(i, ch_dict[i]) for i in label])
+
+            coord.request_stop()
+            coord.join(threads)
 
 
-        coord.request_stop()
-        coord.join(threads)
-
-
+    test_rand_queue()
 
 

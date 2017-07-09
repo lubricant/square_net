@@ -11,6 +11,9 @@ data
 |   |----test： [CASIA 测试集文件 (.gnt)]
 |----mnist：    [MNIST 所有文件] 
 |----record:    [留空]
+|   |----train：[TFRecord 格式训练集文件 (.tfr)]
+|   |----test： [TFRecord 格式测试集文件 (.tfr)]
+|   |----mix：  [TFRecord 格式数据集文件 (.tfr)]
 |----tmp:       [留空]
 '''
 
@@ -49,7 +52,7 @@ def prepare_label_dict(dict_path='tmp/labels_dict.npy'):
     logging.info('Finish preparing label dict.')
 
 
-def prepare_image_files(file_name, data_set, dict_path='labels_dict.npy', img_filter=lambda _: _):
+def prepare_image_files(file_name, data_set, img_per_file=100000, dict_path='labels_dict.npy', img_filter=lambda _: _):
     '''
     将原始图片文件转换为 TFRecord 格式的文件
     '''
@@ -57,45 +60,65 @@ def prepare_image_files(file_name, data_set, dict_path='labels_dict.npy', img_fi
     logging.info('Start preparing image file ......')
 
     _, id_mapping = np.load(dict_path)
-    tf_writer = TFRecordFile(file_name, id_mapping)
 
-    def flush_mnist_image(file_list, fetch_num=300):
+    img_cnt, img_writer = [0], []
+
+    def flush_image(ch_str, img_arr, file_dir):
+
+        writer_id = img_cnt[0] // img_per_file
+        if not img_cnt[0] % img_per_file:
+            img_writer.append(TFRecordFile((file_dir + '/' + file_name) % writer_id, id_mapping))
+            assert writer_id == len(img_writer) - 1
+
+        img_writer[writer_id].write(ch_str, img_filter(img_arr))
+        img_cnt[0] += 1
+
+    def flush_mnist_image(file_list, file_dir, fetch_num=300):
         for file in file_list:
-            for ch, img in file:
+            for record in file:
                 if not fetch_num:
                     return
                 fetch_num -= 1
-                tf_writer.write(ch, img_filter(img))
+                flush_image(*record, file_dir)
 
-    def flush_casia_image(file_list):
+    def flush_casia_image(file_list, file_dir):
         for file in file_list:
-            for ch, img in file:
-                tf_writer.write(ch, img_filter(img))
+            for record in file:
+                flush_image(*record, file_dir)
 
     assert data_set.upper() in ('TRAINING', 'TEST', 'ALL')
 
     if data_set.upper() == 'TRAINING':
-        flush_mnist_image([MnistFile('train-images.idx3-ubyte', 'train-labels.idx1-ubyte')])
-        flush_casia_image([CasiaFile('train/' + name) for name in list_file('casia/train')])
+        ensure_path('record/train')
+        flush_mnist_image([MnistFile('train-images.idx3-ubyte', 'train-labels.idx1-ubyte')], 'train')
+        flush_casia_image([CasiaFile('train/' + name) for name in list_file('casia/train')], 'train')
 
     if data_set.upper() == 'TEST':
-        flush_mnist_image([MnistFile('t10k-images.idx3-ubyte', 't10k-labels.idx1-ubyte')])
-        flush_casia_image([CasiaFile('test/' + name) for name in list_file('casia/test')])
+        ensure_path('record/test')
+        flush_mnist_image([MnistFile('t10k-images.idx3-ubyte', 't10k-labels.idx1-ubyte')], 'test')
+        flush_casia_image([CasiaFile('test/' + name) for name in list_file('casia/test')], 'test')
 
     if data_set.upper() == 'ALL':
+        ensure_path('record/all')
         flush_mnist_image([MnistFile('train-images.idx3-ubyte', 'train-labels.idx1-ubyte'),
-                           MnistFile('t10k-images.idx3-ubyte', 't10k-labels.idx1-ubyte')])
+                           MnistFile('t10k-images.idx3-ubyte', 't10k-labels.idx1-ubyte')], 'all')
         flush_casia_image([CasiaFile('train/' + name) for name in list_file('casia/train')] +
-                          [CasiaFile('test/' + name) for name in list_file('casia/test')])
+                          [CasiaFile('test/' + name) for name in list_file('casia/test')], 'all')
 
-    tf_writer.close()
+    [w.close() for w in img_writer]
 
     logging.info('Finish preparing image file.')
 
 
 if __name__ == '__main__':
+
+    from data.cv_filter import *
+
+    filter = AlignFilter(size=(100, 100), constant_values=255)
+    resize = lambda x: filter.filter(x)
+
     # prepare_label_dict()
-    # prepare_image_files('training_set.tfr', data_set='TRAINING')
-    # prepare_image_files('test_set.tfr', data_set='TEST')
-    prepare_image_files('mixing_set.tfr', data_set='ALL')
+    # prepare_image_files('training_set_%d.tfr', data_set='TRAINING', img_filter=resize)
+    # prepare_image_files('test_set_%d.tfr', data_set='TEST', img_filter=resize)
+    # prepare_image_files('mixing_set_%d.tfr', data_set='ALL', img_filter=resize)
 

@@ -2,9 +2,6 @@
 import cv2
 
 import numpy as np
-from matplotlib import pyplot as plt
-
-from data import CasiaFile
 
 
 class BinaryFilter(object):
@@ -69,6 +66,9 @@ class GaborFilter(object):
         return features
 
 if __name__ == '__main__':
+
+    from matplotlib import pyplot as plt
+    from data.fmt_file import CasiaFile
 
     def gabor_feature(image):
         res = GaborFilter(image.shape).filter(image)

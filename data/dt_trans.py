@@ -1,10 +1,6 @@
 import math
 
 import numpy as np
-from matplotlib import pyplot as plt
-from matplotlib.widgets import Slider
-
-from data import CasiaFile
 
 
 class DT(object):
@@ -91,6 +87,11 @@ class Deform(DT):
 
 
 if __name__ == '__main__':
+
+    from matplotlib import pyplot as plt
+    from matplotlib.widgets import Slider
+
+    from data.fmt_file import CasiaFile
 
     def example_img():
         offset = 5

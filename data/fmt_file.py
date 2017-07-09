@@ -1,5 +1,4 @@
-
-import matplotlib as plt
+import struct
 
 from data import *
 
@@ -119,8 +118,8 @@ class TFRecordFile(object):
         example = tf.train.Example(features=tf.train.Features(feature={
             'label': tf.train.Feature(bytes_list=tf.train.BytesList(value=[ch.encode()])),
             'index': tf.train.Feature(int64_list=tf.train.Int64List(value=[dict_map[ch]])),
-            'image': tf.train.Feature(bytes_list=tf.train.BytesList(value=[img.tostring()])),
-            'shape': tf.train.Feature(int64_list=tf.train.Int64List(value=[*img.shape]))
+            'image': tf.train.Feature(bytes_list=tf.train.BytesList(value=[img.tostring()]))
+            # 'shape': tf.train.Feature(int64_list=tf.train.Int64List(value=[*img.shape]))
         }))
 
         writer.write(example.SerializeToString())
