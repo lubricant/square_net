@@ -119,6 +119,10 @@ def normalization(name):
     return lambda value: tf.nn.local_response_normalization(value, name=name)
 
 
+def dropout(name, keep_prob, **args):
+    return lambda value: tf.nn.dropout(value, name=name, keep_prob=keep_prob, **args)
+
+
 def inception(name, *graph, dtype=tf.float32):
     assert graph and \
            all(isinstance(x, list) for x in graph) and \

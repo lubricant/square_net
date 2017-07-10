@@ -77,39 +77,3 @@ class SquareNet(object):
     # def write_summary(self, sess, path):
     #     writer = tf.summary.FileWriter(path)
     #     writer.add_summary(self.summary)
-
-
-model.init_flags()
-config = tf.app.flags.FLAGS
-
-image_batch, label_batch = data.tf_queue()
-network = SquareNet()
-optimizer = tf.train.GradientDescentOptimizer(learning_rate=config.learning_rate)
-
-global_step = tf.Variable(0, name='global_step', trainable=False)
-train_op = optimizer.minimize(network.loss, global_step=global_step)
-init_op = tf.initialize_all_variables()
-
-with tf.Session() as sess:
-    sess.run(init_op)
-    coord = tf.train.Coordinator()
-    threads = tf.train.start_queue_runners(sess=sess, coord=coord)
-
-    try:
-        # while not coord.should_stop():
-        while True:
-            images, labels = sess.run([image_batch, label_batch])
-            result = sess.run([train_op, network.loss_mean, network.loss_sum],
-                              feed_dict={network.image: images, network.label: labels})
-
-            _, loss_mean, loss_sum = result
-            # print(images)
-            # print(labels)
-    except tf.errors.OutOfRangeError:
-        print('Done reading')
-    finally:
-        coord.request_stop()
-
-    coord.join(threads)
-
-

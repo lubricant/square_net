@@ -9,6 +9,10 @@ import data as this
 __data_path = os.path.abspath(os.path.join(inspect.getfile(this), os.pardir))
 
 
+IMAGE_SIZE = 100
+(EM_TRAINING, EM_TEST, EM_MIXING) = ('TRAINING', 'TEST', 'MIXING')
+
+
 def get_path(path):
     path = path.replace('/', os.path.sep)
     if not path.startswith(os.path.sep):
@@ -42,9 +46,9 @@ def label_dict(dict_path='labels_dict.npy'):
     return np.load(get_path(dict_path))
 
 
-def data_queue(exec_mode, batch_size, image_size, thread_num=1, epoch_num=None):
+def data_queue(exec_mode, batch_size, thread_num=1, epoch_num=None):
 
-    assert batch_size > 0 and image_size > 0
+    assert batch_size > 0 and thread_num > 0
 
     data_set = {
         'TRAINING': 'record/train',
@@ -65,7 +69,7 @@ def data_queue(exec_mode, batch_size, image_size, thread_num=1, epoch_num=None):
             'image': tf.FixedLenFeature([], tf.string)})
 
     labels = tf.cast(features['index'], tf.int32)
-    images = tf.reshape(tf.decode_raw(features['image'], tf.uint8), [image_size, image_size])
+    images = tf.reshape(tf.decode_raw(features['image'], tf.uint8), [IMAGE_SIZE, IMAGE_SIZE])
 
     rand_data_queue = tf.train.shuffle_batch([images, labels],
                                              batch_size=batch_size,
