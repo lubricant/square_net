@@ -9,7 +9,7 @@ import data as this
 __data_path = os.path.abspath(os.path.join(inspect.getfile(this), os.pardir))
 
 
-IMAGE_SIZE = 100
+IMG_SIZE, IMG_CHANNEL = 100, 1
 (EM_TRAINING, EM_TEST, EM_MIXING) = ('TRAINING', 'TEST', 'MIXING')
 
 
@@ -59,7 +59,7 @@ def data_queue(exec_mode, batch_size, thread_num=1, epoch_num=None):
 
     data_set_dir = data_set[exec_mode.upper()]
     filename_queue = tf.train.string_input_producer([
-        get_path(data_set_dir + '/' + f) for f in list_file(data_set_dir)], num_epochs=epoch_num)
+        get_path(data_set_dir + '/' + f) for f in list_file(data_set_dir) if os.path.isfile(f)], num_epochs=epoch_num)
 
     _, serialized_example = tf.TFRecordReader().read(filename_queue)
     features = tf.parse_single_example(
@@ -69,7 +69,7 @@ def data_queue(exec_mode, batch_size, thread_num=1, epoch_num=None):
             'image': tf.FixedLenFeature([], tf.string)})
 
     labels = tf.cast(features['index'], tf.int32)
-    images = tf.reshape(tf.decode_raw(features['image'], tf.uint8), [IMAGE_SIZE, IMAGE_SIZE])
+    images = tf.reshape(tf.decode_raw(features['image'], tf.uint8), [IMG_SIZE, IMG_SIZE, IMG_CHANNEL])
 
     rand_data_queue = tf.train.shuffle_batch([images, labels],
                                              batch_size=batch_size,
@@ -109,7 +109,7 @@ if __name__ == '__main__':
             coord.join(threads)
 
     def test_rand_queue():
-        image_batch, label_batch = data_queue(exec_mode='test', batch_size=100, image_size=100, epoch_num=1)
+        image_batch, label_batch = data_queue(exec_mode=EM_TEST, batch_size=100, epoch_num=1)
         init_op = tf.group(tf.initialize_all_variables(),
                            tf.initialize_local_variables())
         with tf.Session() as sess:

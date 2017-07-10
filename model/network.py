@@ -1,8 +1,6 @@
 
 import tensorflow as tf
 import model.layer as layer
-import data
-import model
 
 
 class SquareNet(object):
@@ -14,7 +12,9 @@ class SquareNet(object):
     def __build_network(self):
         assert not tf.get_variable_scope().original_name_scope
 
-        self.image = layer.data('Input', [None, 120, 120, 1])
+        FLAGS = tf.app.flags.FLAGS
+
+        self.image = layer.data('Input', [None, FLAGS.image_size, FLAGS.image_size, FLAGS.image_channel])
         self.label = layer.data('Label', [None], tf.int32)
 
         self.conv1 = layer.convolution('Conv_7x7x64', [7, 7, 64], 2)(self.image)
