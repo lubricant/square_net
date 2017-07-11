@@ -16,7 +16,7 @@ config.graph_options.optimizer_options.global_jit_level = tf.OptimizerOptions.ON
 
 def train_routine(network):
 
-    sum_op = network.summary
+    log_op = network.summary
 
     step_op = tf.Variable(0, name='global_step', trainable=False)
 
@@ -35,7 +35,7 @@ def train_routine(network):
         sess.run(init_op)
 
         saver = tf.train.Saver()
-        writer = tf.summary.FileWriter(FLAGS.summary_dir, sess.graph)
+        writer = tf.summary.FileWriter(FLAGS.log_dir, sess.graph)
 
         coord = tf.train.Coordinator()
         threads = tf.train.start_queue_runners(sess=sess, coord=coord)
@@ -49,14 +49,13 @@ def train_routine(network):
 
                 step = sess.run(step_op)
                 if not step or step % FLAGS.log_interval:
-                    summary, _ = sess.run([sum_op, train_op], feed_dict)
-                    writer.add_summary(summary, global_step=step_op)
+                    sess.run(train_op, feed_dict)
                 else:
 
                     run_meta = tf.RunMetadata()
                     run_opt = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
 
-                    summary, _ = sess.run([sum_op, train_op], feed_dict, options=run_opt, run_metadata=run_meta)
+                    summary, _ = sess.run([log_op, train_op], feed_dict, options=run_opt, run_metadata=run_meta)
                     writer.add_run_metadata(run_meta, 'step%03d' % step)
                     writer.add_summary(summary, global_step=step_op)
 
@@ -97,10 +96,10 @@ def test_routine(network):
         coord = tf.train.Coordinator()
         threads = tf.train.start_queue_runners(sess=sess, coord=coord)
 
-        total_cnt = 0
+        (TP, FP, FN) = 0, 1, 2
+        confuse_mat = np.zeros([3, data.NUM_CLASSES])
 
-        (TP, TN, FP, FN) = 0, 1, 2, 3
-        confuse_mat = np.zeros([4, data.NUM_CLASSES])
+        total_correct, total_error = 0, 0
 
         try:
 
@@ -112,11 +111,15 @@ def test_routine(network):
                 inference = np.argmax(logits, axis=-1)
                 assert labels.shape == inference.shape
 
-                correct_labels = labels[labels == inference]
-                error_labels = labels[labels != inference]
+                for correct in np.where(labels == inference):
+                    confuse_mat[TP][labels[correct]] += 1
+                    total_correct += 1
 
-                total_cnt += len(labels)
-                confuse_mat[TP] = 0
+                for error in np.where(labels != inference):
+                    pos, neg = labels[error], inference[error]
+                    confuse_mat[FP][neg] += 1
+                    confuse_mat[FN][pos] += 1
+                    total_error += 1
 
         except tf.errors.OutOfRangeError:
             pass
@@ -125,16 +128,53 @@ def test_routine(network):
             coord.request_stop()
             coord.join(threads)
 
+        reverse_dict, = data.label_dict()
+
+        with np.errstate(divide='ignore', invalid='ignore'):
+            accuracy = total_correct / (total_correct + total_error)
+            precision = confuse_mat[TP] / (confuse_mat[TP] + confuse_mat[FP])
+            recall = confuse_mat[TP] / (confuse_mat[TP] + confuse_mat[FN])
+
+            accuracy = 0 if np.isfinite(accuracy) else accuracy
+            precision[~np.isfinite(precision)] = 0
+            recall[~np.isfinite(recall)] = 0
+
+        N = 10
+
+        arg_precision = np.argsort(precision)
+        arg_recall = np.argsort(recall)
+
+        arg_precision = arg_precision[precision[arg_precision] > 0]
+        arg_recall = arg_recall[recall[arg_recall] > 0]
+
+        best_precision, worst_precision = arg_precision[-N:], arg_precision[:N]
+        best_recall, worst_recall = arg_recall[-N:], arg_recall[:N]
+
+        def arg_fmt(arg_list):
+            '\n\t\t'.join(['%s: %f' % (reverse_dict[arg], precision[arg]) for arg in arg_list])
+
+        print("""
+        Test Result:
+        
+        Accuracy: {accuracy}
+        
+        Best {N} Precision: {best_precision}
+            
+        Worst {N} Precision: {worst_precision}
+            
+        Best {N} Recall: {best_recall}
+            
+        Worst {N} Recall: {worst_recall}
+            
+        """.format(N=N, accuracy=accuracy,
+                   best_precision=arg_fmt(best_precision),
+                   worst_precision=arg_fmt(worst_precision),
+                   best_recall=arg_fmt(best_recall),
+                   worst_recall=arg_fmt(worst_recall)))
+
 
 if __name__ == '__main__':
     # network = SquareNet()
     # train_routine(network)
-    a = np.array([1,2,3,4,5])
-    b = np.array([1,7,3,9,0])
-    print(np.where(a == b))
-    print(np.where(a != b))
-    print(np.where(a not in b))
-
-
-
+    pass
 
