@@ -34,7 +34,7 @@ def loss(name):
                   if len(labels.shape) == 2 else
                   tf.nn.sparse_softmax_cross_entropy_with_logits)  # batch_size = labels.shape
 
-        return l_func(logits=logits, labels=labels, name=name)
+        return tf.reduce_mean(l_func(logits=logits, labels=labels, name=name))
 
     return __
 
@@ -94,7 +94,7 @@ def pooling(name, p_shape, p_type, stride=1, padding='SAME'):
     return __
 
 
-def density(name, neurons, dtype=tf.float32):
+def density(name, neurons, linear=False, dtype=tf.float32):
     __assert_type(name, str)
     __assert_type(neurons, int)
 
@@ -109,8 +109,9 @@ def density(name, neurons, dtype=tf.float32):
 
             weight = tf.Variable(rand, name='weight')
             bias = tf.Variable(tf.zeros([neurons]), name='bias')
-            relu = tf.nn.relu(tf.nn.bias_add(tf.matmul(value, weight), bias))
-            return relu
+            fc = tf.nn.bias_add(tf.matmul(value, weight), bias)
+
+            return fc if linear else tf.nn.relu(fc)
 
     return __
 

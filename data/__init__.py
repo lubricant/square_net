@@ -9,6 +9,7 @@ import data as this
 __data_path = os.path.abspath(os.path.join(inspect.getfile(this), os.pardir))
 
 
+NUM_CLASSES = 10 + 3755
 IMG_SIZE, IMG_CHANNEL = 100, 1
 (EM_TRAINING, EM_TEST, EM_MIXING) = ('TRAINING', 'TEST', 'MIXING')
 

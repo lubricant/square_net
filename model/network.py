@@ -14,10 +14,10 @@ class SquareNet(object):
 
         FLAGS = tf.app.flags.FLAGS
 
-        self.image = layer.data('Input', [None, FLAGS.image_size, FLAGS.image_size, FLAGS.image_channel])
-        self.label = layer.data('Label', [None], tf.int32)
+        self.images = layer.data('Input', [None, FLAGS.image_size, FLAGS.image_size, FLAGS.image_channel])
+        self.labels = layer.data('Label', [None], tf.int32)
 
-        self.conv1 = layer.convolution('Conv_7x7x64', [7, 7, 64], 2)(self.image)
+        self.conv1 = layer.convolution('Conv_7x7x64', [7, 7, 64], 2)(self.images)
         self.pool1 = layer.pooling('MaxPool_3x3', [3, 3], 'MAX', stride=2)(self.conv1)
         self.norm1 = layer.normalization('LocalRespNorm')(self.pool1)
 
@@ -54,16 +54,18 @@ class SquareNet(object):
 
         self.pool4 = layer.pooling('MaxPool_3x3', [5, 5], 'MAX', stride=3)(self.incp4)
         self.conv4 = layer.convolution('Conv_1x1x128', [1, 1, 128])(self.pool4)
-        self.fc = layer.density('FC_1024', 1024)(self.conv4)
+        self.logits = layer.density('FC_1024', 1024, linear=True)(self.conv4)
 
-        self.loss = layer.loss('Softmax')(self.fc, self.label)
-        self.loss_sum = tf.reduce_sum(self.loss)
-        self.loss_mean = tf.reduce_mean(self.loss)
+        self.loss = layer.loss('CrossEntropy')(self.logits, self.labels)
+
+        with tf.name_scope('Accuracy'):
+            self.accuracy = tf.reduce_mean(tf.cast(
+                tf.equal(tf.argmax(self.labels, 1), tf.argmax(self.logits, 1)), tf.float32))
 
     def __build_summary(self):
 
-        tf.summary.scalar('loss_sum', self.loss_sum)
-        tf.summary.scalar('loss_mean', self.loss_mean)
+        tf.summary.scalar('accuracy', self.accuracy)
+        tf.summary.scalar('loss', self.loss)
         self.summary = tf.summary.merge_all()
 
     # def restore_network(self, sess, path):
