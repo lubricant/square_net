@@ -6,7 +6,7 @@ from model.network import SquareNet
 
 
 flags = tf.app.flags
-flags.DEFINE_string('exec_mode', data.EM_TRAINING, 'Application execute mode.')
+flags.DEFINE_string('exec_mode', data.EM_TEST, 'Application execute mode.')
 
 flags.DEFINE_integer('image_size', data.IMG_SIZE, 'Image data size.')
 flags.DEFINE_integer('image_channel', data.IMG_CHANNEL, 'Image data size.')

@@ -2,7 +2,7 @@ import tensorflow as tf
 from tensorflow.python.client import timeline
 
 import data
-import model.network
+from model.network import SquareNet
 
 
 FLAGS = tf.app.flags.FLAGS
@@ -30,7 +30,7 @@ def train_routine(network):
     init_op = tf.group(tf.initialize_all_variables(),
                        tf.initialize_local_variables())
 
-    with tf.Session(config=config) as sess, open(FLAGS.trace_file) as trace:
+    with tf.Session(config=config) as sess, open(FLAGS.trace_file, 'w') as trace:
         sess.run(init_op)
 
         saver = tf.train.Saver()
@@ -74,7 +74,7 @@ def train_routine(network):
             pass
 
 
-def test():
+def test_routine():
 
     test_op = None
     init_op = tf.initialize_all_variables()
@@ -87,11 +87,9 @@ def test():
     pass
 
 
-def main(_):
-
-    if tf.gfile.Exists(FLAGS.log_dir):
-        tf.gfile.DeleteRecursively(FLAGS.log_dir)
-    tf.gfile.MakeDirs(FLAGS.log_dir)
+if __name__ == '__main__':
+    network = SquareNet()
+    train_routine(network)
 
 
 

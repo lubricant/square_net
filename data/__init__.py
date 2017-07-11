@@ -58,8 +58,9 @@ def data_queue(exec_mode, batch_size, thread_num=1, epoch_num=None):
     assert exec_mode and exec_mode.upper() in data_set
 
     data_set_dir = data_set[exec_mode.upper()]
-    filename_queue = tf.train.string_input_producer([
-        get_path(data_set_dir + '/' + f) for f in list_file(data_set_dir) if os.path.isfile(f)], num_epochs=epoch_num)
+    filename_queue = tf.train.string_input_producer(
+        list(filter(lambda f: os.path.isfile(f), [get_path(data_set_dir + '/' + f) for f in list_file(data_set_dir)])),
+        num_epochs=epoch_num)
 
     _, serialized_example = tf.TFRecordReader().read(filename_queue)
     features = tf.parse_single_example(
@@ -131,5 +132,4 @@ if __name__ == '__main__':
 
 
     test_rand_queue()
-
 
