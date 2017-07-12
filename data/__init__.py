@@ -71,7 +71,8 @@ def data_queue(exec_mode, batch_size, thread_num=1, epoch_num=None):
             'image': tf.FixedLenFeature([], tf.string)})
 
     labels = tf.cast(features['index'], tf.int32)
-    images = tf.reshape(tf.decode_raw(features['image'], tf.uint8), [IMG_SIZE, IMG_SIZE, IMG_CHANNEL])
+    images = tf.reshape((tf.cast(tf.decode_raw(features['image'], tf.uint8), tf.float32) / 255. - .5),
+                        [IMG_SIZE, IMG_SIZE, IMG_CHANNEL])
 
     rand_data_queue = tf.train.shuffle_batch([images, labels],
                                              batch_size=batch_size,

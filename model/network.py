@@ -54,7 +54,7 @@ class SquareNet(object):
 
         self.pool4 = layer.pooling('MaxPool_3x3', [5, 5], 'MAX', stride=3)(self.incp4)
         self.conv4 = layer.convolution('Conv_1x1x128', [1, 1, 128])(self.pool4)
-        self.logits = layer.density('FC_1024', 1024, linear=True)(self.conv4)
+        self.logits = layer.density('FC_1024', FLAGS.label_num, linear=True)(self.conv4)
 
         self.loss = layer.loss('CrossEntropy')(self.logits, self.labels)
 

@@ -11,6 +11,7 @@ flags.DEFINE_string('exec_mode', data.EM_TEST, 'Application execute mode.')
 flags.DEFINE_float('learning_rate', 0.001, 'Initial learning rate.')
 flags.DEFINE_float('keep_prob', 0.9, 'Keep probability for training dropout.')
 
+flags.DEFINE_integer('label_num', data.NUM_CLASSES, 'Image data size.')
 flags.DEFINE_integer('image_size', data.IMG_SIZE, 'Image data size.')
 flags.DEFINE_integer('image_channel', data.IMG_CHANNEL, 'Image data size.')
 flags.DEFINE_integer('batch_size', 100, 'Batch size of each step.')

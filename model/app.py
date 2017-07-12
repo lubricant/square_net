@@ -139,7 +139,7 @@ def test_routine(network):
             precision[~np.isfinite(precision)] = 0
             recall[~np.isfinite(recall)] = 0
 
-        N = 10
+        top_N = 10
 
         arg_precision = np.argsort(precision)
         arg_recall = np.argsort(recall)
@@ -147,8 +147,8 @@ def test_routine(network):
         arg_precision = arg_precision[precision[arg_precision] > 0]
         arg_recall = arg_recall[recall[arg_recall] > 0]
 
-        best_precision, worst_precision = arg_precision[-N:], arg_precision[:N]
-        best_recall, worst_recall = arg_recall[-N:], arg_recall[:N]
+        best_precision, worst_precision = arg_precision[-top_N:], arg_precision[:top_N]
+        best_recall, worst_recall = arg_recall[-top_N:], arg_recall[:top_N]
 
         def arg_fmt(arg_list):
             '\n\t\t'.join(['%s: %f' % (reverse_dict[arg], precision[arg]) for arg in arg_list])
@@ -166,7 +166,7 @@ def test_routine(network):
             
         Worst {N} Recall: {worst_recall}
             
-        """.format(N=N, accuracy=accuracy,
+        """.format(N=top_N, accuracy=accuracy,
                    best_precision=arg_fmt(best_precision),
                    worst_precision=arg_fmt(worst_precision),
                    best_recall=arg_fmt(best_recall),
@@ -174,7 +174,7 @@ def test_routine(network):
 
 
 if __name__ == '__main__':
-    # network = SquareNet()
-    # train_routine(network)
+    network = SquareNet()
+    train_routine(network)
     pass
 

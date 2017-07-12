@@ -57,7 +57,7 @@ def convolution(name, k_shape, stride=1, padding='SAME', dtype=tf.float32):
             rand = tf.random_uniform(shape, minval=-bound, maxval=bound, dtype=dtype)
 
             filt = tf.Variable(rand, name='filt')
-            conv = tf.nn.conv2d(value, filt, [stride]*4, padding.upper())
+            conv = tf.nn.conv2d(value, filt, [1, stride, stride, 1], padding.upper())
             bias = tf.Variable(tf.zeros(conv.shape[-1]), name='bias')
             relu = tf.nn.relu(tf.nn.bias_add(conv, bias))
             return relu
