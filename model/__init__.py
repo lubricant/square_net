@@ -1,9 +1,13 @@
+import sys
+import logging
 
 import tensorflow as tf
 
 import data
-from model.network import SquareNet
 
+'''
+    TensorFlow global configuration
+'''
 
 flags = tf.app.flags
 flags.DEFINE_string('exec_mode', data.EM_TEST, 'Application execute mode.')
@@ -24,3 +28,40 @@ flags.DEFINE_string('log_dir', data.get_path('tmp/summary'), 'Summaries director
 flags.DEFINE_string('checkpoint_dir', data.get_path('tmp/checkpoint'), 'Models directory.')
 flags.DEFINE_string('trace_file', data.get_path('tmp/trace.ctf.json'), 'Chrome timeline format file.')
 
+
+'''
+    Custom logging config
+'''
+
+logging.basicConfig(level=logging.DEBUG,
+                    format='[%(asctime)s - %(levelname)s] %(message)s',
+                    datefmt='%Y-%m-%d %H:%M:%S',
+                    stream=sys.stdout)
+
+BLACK, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE = range(30, 38)
+COLOR_SEQ, RESET_SEQ = "\033[1;%dm", "\033[0m"
+
+logging.addLevelName(logging.DEBUG, COLOR_SEQ % BLUE + 'DEBUG' + RESET_SEQ)
+logging.addLevelName(logging.INFO, COLOR_SEQ % GREEN + 'INFO' + RESET_SEQ )
+logging.addLevelName(logging.WARNING, COLOR_SEQ % YELLOW + 'WARN' + RESET_SEQ)
+logging.addLevelName(logging.ERROR, COLOR_SEQ % RED + 'ERROR' + RESET_SEQ)
+logging.addLevelName(logging.CRITICAL, COLOR_SEQ % MAGENTA + 'CRITICAL' + RESET_SEQ)
+
+
+'''
+    Print config
+'''
+
+FLAGS = tf.app.flags.FLAGS
+FLAGS._parse_flags()
+
+flags_detail = {int: [], float: [], str: []}
+[flags_detail[type(v)].append('%- 20s: %- 50s' % (k, str(v))) for k, v in FLAGS.__dict__['__flags'].items()]
+
+print('-'*75)
+print('|\t' + '\n|\t'.join(flags_detail[str]))
+print('-'*75)
+print('|\t' + '\n|\t'.join(flags_detail[int]))
+print('-'*75)
+print('|\t' + '\n|\t'.join(flags_detail[float]))
+print('-'*75)

@@ -1,3 +1,5 @@
+import logging
+
 import numpy as np
 import tensorflow as tf
 from tensorflow.python.client import timeline
@@ -14,7 +16,9 @@ config.gpu_options.allow_growth = True
 config.graph_options.optimizer_options.global_jit_level = tf.OptimizerOptions.ON_1
 
 
-def train_routine(network):
+def training_routine(network):
+
+    logging.info('Training procedure starting ...')
 
     log_op = network.summary
 
@@ -77,7 +81,9 @@ def train_routine(network):
             pass
 
 
-def test_routine(network):
+def validation_routine(network):
+
+    logging.info('Test procedure starting ...')
 
     queue_op = data.data_queue(
         exec_mode=FLAGS.exec_mode,
@@ -175,6 +181,6 @@ def test_routine(network):
 
 if __name__ == '__main__':
     network = SquareNet()
-    train_routine(network)
+    training_routine(network)
     pass
 
