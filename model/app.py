@@ -57,7 +57,7 @@ def train_routine(network):
 
                     summary, _ = sess.run([log_op, train_op], feed_dict, options=run_opt, run_metadata=run_meta)
                     writer.add_run_metadata(run_meta, 'step%03d' % step)
-                    writer.add_summary(summary, global_step=step_op)
+                    writer.add_summary(summary, global_step=step)
 
                     stats = timeline.Timeline(step_stats=run_meta.step_stats)
                     trace.write(stats.generate_chrome_trace_format())
