@@ -15,7 +15,7 @@ class SquareNet(object):
         FLAGS = tf.app.flags.FLAGS
 
         self.images = layer.data('Input', [None, FLAGS.image_size, FLAGS.image_size, FLAGS.image_channel])
-        self.labels = layer.data('Label', [None], tf.int32)
+        self.labels = layer.data('Label', [None], tf.int64)
 
         self.conv1 = layer.convolution('Conv_7x7x64', [7, 7, 64], 2)(self.images)
         self.pool1 = layer.pooling('MaxPool_3x3', [3, 3], 'MAX', stride=2)(self.conv1)
@@ -56,11 +56,11 @@ class SquareNet(object):
         self.conv4 = layer.convolution('Conv_1x1x128', [1, 1, 128])(self.pool4)
         self.logits = layer.density('FC_1024', FLAGS.label_num, linear=True)(self.conv4)
 
-        self.loss = layer.loss('CrossEntropy')(self.logits, self.labels)
+        self.loss = layer.loss('Loss')(self.logits, self.labels)
 
         with tf.name_scope('Accuracy'):
             self.accuracy = tf.reduce_mean(tf.cast(
-                tf.equal(tf.argmax(self.labels, 1), tf.argmax(self.logits, 1)), tf.float32))
+                tf.equal(self.labels, tf.argmax(self.logits, 1)), tf.float32))
 
     def __build_summary(self):
 
@@ -68,14 +68,3 @@ class SquareNet(object):
         tf.summary.scalar('loss', self.loss)
         self.summary = tf.summary.merge_all()
 
-    # def restore_network(self, sess, path):
-    #     saver = tf.train.Saver()
-    #     saver.restore(sess, path)
-    #
-    # def save_network(self, sess, path):
-    #     saver = tf.train.Saver()
-    #     saver.save(sess, path)
-    #
-    # def write_summary(self, sess, path):
-    #     writer = tf.summary.FileWriter(path)
-    #     writer.add_summary(self.summary)
