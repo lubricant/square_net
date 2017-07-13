@@ -25,7 +25,7 @@ flags.DEFINE_integer("log_interval", 10, 'Number of step between each logging.')
 flags.DEFINE_integer("checkpoint_interval", 100, 'Number of step between each checkpoint.')
 
 flags.DEFINE_string('log_dir', data.get_path('tmp/summary'), 'Summaries directory.')
-flags.DEFINE_string('checkpoint_dir', data.get_path('tmp/checkpoint'), 'Models directory.')
+flags.DEFINE_string('checkpoint_dir', data.get_path('tmp/checkpoint/status'), 'Models directory.')
 flags.DEFINE_string('trace_file', data.get_path('tmp/trace.ctf.json'), 'Chrome timeline format file.')
 
 
@@ -41,8 +41,8 @@ logging.basicConfig(level=logging.DEBUG,
 BLACK, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE = range(30, 38)
 COLOR_SEQ, RESET_SEQ = "\033[1;%dm", "\033[0m"
 
-logging.addLevelName(logging.DEBUG, COLOR_SEQ % BLUE + 'DEBUG' + RESET_SEQ)
-logging.addLevelName(logging.INFO, COLOR_SEQ % GREEN + 'INFO' + RESET_SEQ )
+logging.addLevelName(logging.DEBUG, COLOR_SEQ % GREEN + 'DEBUG' + RESET_SEQ)
+logging.addLevelName(logging.INFO, COLOR_SEQ % CYAN + 'INFO' + RESET_SEQ )
 logging.addLevelName(logging.WARNING, COLOR_SEQ % YELLOW + 'WARN' + RESET_SEQ)
 logging.addLevelName(logging.ERROR, COLOR_SEQ % RED + 'ERROR' + RESET_SEQ)
 logging.addLevelName(logging.CRITICAL, COLOR_SEQ % MAGENTA + 'CRITICAL' + RESET_SEQ)

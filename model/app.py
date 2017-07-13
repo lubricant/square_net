@@ -32,8 +32,8 @@ def training_routine(network):
         batch_size=FLAGS.batch_size,
         epoch_num=FLAGS.epoch_num)
 
-    init_op = tf.group(tf.initialize_all_variables(),
-                       tf.initialize_local_variables())
+    init_op = tf.group(tf.global_variables_initializer(),
+                       tf.local_variables_initializer())
 
     with tf.Session(config=config) as sess, open(FLAGS.trace_file, 'w') as trace:
         sess.run(init_op)
@@ -43,6 +43,8 @@ def training_routine(network):
 
         coord = tf.train.Coordinator()
         threads = tf.train.start_queue_runners(sess=sess, coord=coord)
+
+        logging.info('Training procedure is ready')
 
         try:
 
@@ -66,8 +68,12 @@ def training_routine(network):
                     stats = timeline.Timeline(step_stats=run_meta.step_stats)
                     trace.write(stats.generate_chrome_trace_format())
 
+                    logging.info('Report step: {}'.format(step))
+
                 if step and not step % FLAGS.checkpoint_interval:
+                    logging.info('Saving checkpoint {} ...'.format(step//FLAGS.checkpoint_interval))
                     saver.save(sess, FLAGS.checkpoint_dir, global_step=step_op)
+                    logging.info('Saving checkpoint done')
 
         except tf.errors.OutOfRangeError:
             pass
@@ -77,8 +83,7 @@ def training_routine(network):
             coord.request_stop()
             coord.join(threads)
 
-        while not coord.should_stop():
-            pass
+        logging.info('Training procedure is finish')
 
 
 def validation_routine(network):
@@ -90,14 +95,16 @@ def validation_routine(network):
         batch_size=FLAGS.batch_size,
         epoch_num=1)
 
-    init_op = tf.group(tf.initialize_all_variables(),
-                       tf.initialize_local_variables())
+    init_op = tf.group(tf.global_variables_initializer(),
+                       tf.local_variables_initializer())
 
     with tf.Session(config=config) as sess:
         sess.run(init_op)
 
+        logging.info('Loading checkpoint ...')
         saver = tf.train.Saver(var_list=tf.all_variables())
         saver.restore(sess, FLAGS.checkpoint_dir)
+        logging.info('Loading checkpoint done')
 
         coord = tf.train.Coordinator()
         threads = tf.train.start_queue_runners(sess=sess, coord=coord)
@@ -107,6 +114,7 @@ def validation_routine(network):
 
         total_correct, total_error = 0, 0
 
+        logging.info('Test procedure is ready')
         try:
 
             while True:
@@ -182,5 +190,7 @@ def validation_routine(network):
 if __name__ == '__main__':
     network = SquareNet()
     training_routine(network)
+    # validation_routine(network)
     pass
+
 
