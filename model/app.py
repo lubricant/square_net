@@ -84,6 +84,7 @@ def training_routine(network):
             coord.join(threads)
 
         logging.info('Training procedure is finish')
+        logging.info('Total step: {}'.format(sess.run(step_op)))
 
 
 def validation_routine(network):
