@@ -72,7 +72,7 @@ def training_routine(network):
 
                 if step and not step % FLAGS.checkpoint_interval:
                     logging.info('Saving checkpoint {} ...'.format(step//FLAGS.checkpoint_interval))
-                    saver.save(sess, FLAGS.checkpoint_dir, global_step=step_op)
+                    saver.save(sess, FLAGS.checkpoint_file, global_step=step_op)
                     logging.info('Saving checkpoint done')
 
         except tf.errors.OutOfRangeError:
@@ -103,8 +103,8 @@ def validation_routine(network):
         sess.run(init_op)
 
         logging.info('Loading checkpoint ...')
-        saver = tf.train.Saver(var_list=tf.all_variables())
-        saver.restore(sess, FLAGS.checkpoint_dir)
+        saver = tf.train.Saver(var_list=tf.global_variables() + tf.local_variables())
+        saver.recover_last_checkpoints(FLAGS.checkpoint_dir)
         logging.info('Loading checkpoint done')
 
         coord = tf.train.Coordinator()
@@ -190,8 +190,8 @@ def validation_routine(network):
 
 if __name__ == '__main__':
     network = SquareNet()
-    training_routine(network)
-    # validation_routine(network)
+    # training_routine(network)
+    validation_routine(network)
     pass
 
 

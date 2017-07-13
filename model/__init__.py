@@ -26,7 +26,8 @@ flags.DEFINE_integer("log_interval", 100, 'Number of step between each logging.'
 flags.DEFINE_integer("checkpoint_interval", 1000, 'Number of step between each checkpoint.')
 
 flags.DEFINE_string('log_dir', data.get_path('tmp/summary'), 'Summaries directory.')
-flags.DEFINE_string('checkpoint_dir', data.get_path('tmp/checkpoint/status'), 'Models directory.')
+flags.DEFINE_string('checkpoint_dir', data.get_path('tmp/checkpoint'), 'Checkpoint directory.')
+flags.DEFINE_string('checkpoint_file', data.get_path('tmp/checkpoint/status'), 'Checkpoint file prefix.')
 flags.DEFINE_string('trace_file', data.get_path('tmp/trace.ctf.json'), 'Chrome timeline format file.')
 
 
