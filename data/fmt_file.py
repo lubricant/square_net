@@ -14,11 +14,12 @@ class MnistFile(object):
         测试集：每个数字约 1000 张
     '''
 
-    def __init__(self, image_filename, label_filename):
+    def __init__(self, image_filename, label_filename, reverse_pixel=False):
         assert exist_path('mnist/' + image_filename) and \
                exist_path('mnist/' + label_filename)
         self.__img_filepath = 'mnist/' + image_filename
         self.__lab_filepath = 'mnist/' + label_filename
+        self.__reverse = reverse_pixel
 
     def __iter__(self):
         img_file = open(get_path(self.__img_filepath), 'rb')
@@ -47,7 +48,8 @@ class MnistFile(object):
             return np.array(labels, dtype=np.uint8)
 
         for ch, img in zip(read_lab(), read_img()):
-            np.subtract(255, img, img)
+            if self.__reverse:
+                np.subtract(255, img, img)
             yield str(ch), img
 
 
@@ -60,9 +62,10 @@ class CasiaFile(object):
         训练集：每个汉字约 60 个样本
     '''
 
-    def __init__(self, filename):
+    def __init__(self, filename, reverse_pixel=True):
         assert exist_path('casia/' + filename)
         self.__filepath = 'casia/' + filename
+        self.__reverse = reverse_pixel
 
     def __iter__(self):
 
@@ -76,6 +79,8 @@ class CasiaFile(object):
             data_len = length - 10
             data_tag = code.decode('gbk')
             data_img = np.fromstring(file.read(data_len), np.uint8).reshape((row, col))
+            if self.__reverse:
+                np.subtract(255, data_img, data_img)
             yield (data_tag, data_img)
 
 
