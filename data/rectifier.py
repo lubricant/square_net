@@ -115,7 +115,7 @@ if __name__ == '__main__':
     from data.cv_filter import *
     from data import IMG_SIZE
 
-    filter = AlignFilter(size=(IMG_SIZE, IMG_SIZE), constant_values=255)
+    filter = AlignFilter(size=(IMG_SIZE, IMG_SIZE), constant_values=0)
     resize = lambda x: filter.filter(x)
 
     # prepare_label_dict()

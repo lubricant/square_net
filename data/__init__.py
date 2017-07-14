@@ -10,7 +10,7 @@ __data_path = os.path.abspath(os.path.join(inspect.getfile(this), os.pardir))
 
 
 NUM_CLASSES = 10 + 3755
-IMG_SIZE, IMG_CHANNEL = 100, 1
+IMG_SIZE, IMG_CHANNEL = 112, 1
 (EM_TRAINING, EM_TEST, EM_MIXING) = ('TRAINING', 'TEST', 'MIXING')
 
 
@@ -84,6 +84,7 @@ def data_queue(exec_mode, batch_size, thread_num=1, epoch_num=None):
 
 if __name__ == '__main__':
 
+    from matplotlib import pyplot as plt
     from data.cv_filter import *
     from data.dt_trans import *
 
@@ -123,11 +124,14 @@ if __name__ == '__main__':
 
             for i in range(50):
                 image, label = sess.run([image_batch, label_batch])
-                batch, each_shape = image.shape[0], image.shape[1:]
                 print([(i, ch_dict[i]) for i in label])
                 print(image.shape, type(image.shape[0]))
                 # gabor_filter = GaborFilter((100, 100))
                 # gabor_part = np.array()
+
+                # img = image[0]
+                # plt.imshow(img.reshape(img.shape[:-1]), cmap='gray')
+                # plt.show()
 
             coord.request_stop()
             coord.join(threads)
