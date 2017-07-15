@@ -61,7 +61,10 @@ def prepare_image_files(file_name, data_set, img_per_file=100000, dict_path='lab
 
     _, id_mapping = np.load(dict_path)
 
-    img_cnt, img_writer = [0], []
+    img_cnt, img_writer, digits_cnt = [0], [], {}
+
+    for i in range(10):
+        digits_cnt[str(i)] = 0
 
     def flush_image(ch_str, img_arr, file_dir):
 
@@ -73,13 +76,22 @@ def prepare_image_files(file_name, data_set, img_per_file=100000, dict_path='lab
         img_writer[writer_id].write(ch_str, img_filter(img_arr))
         img_cnt[0] += 1
 
-    def flush_mnist_image(file_list, file_dir, fetch_num=300):
+    def flush_mnist_image(file_list, file_dir, fetch_num):
         for file in file_list:
-            for record in file:
-                if not fetch_num:
+            for digit, img in file:
+
+                if not len(digits_cnt.keys()):
                     return
-                fetch_num -= 1
-                flush_image(*record, file_dir)
+
+                if digit not in digits_cnt:
+                    continue
+
+                if digits_cnt[digit] == fetch_num:
+                    del digits_cnt[digit]
+                    continue
+
+                digits_cnt[digit] += 1
+                flush_image(digit, img, file_dir)
 
     def flush_casia_image(file_list, file_dir):
         for file in file_list:
@@ -90,18 +102,18 @@ def prepare_image_files(file_name, data_set, img_per_file=100000, dict_path='lab
 
     if data_set.upper() == 'TRAINING':
         ensure_path('record/train')
-        flush_mnist_image([MnistFile('train-images.idx3-ubyte', 'train-labels.idx1-ubyte')], 'train')
+        flush_mnist_image([MnistFile('train-images.idx3-ubyte', 'train-labels.idx1-ubyte')], 'train', fetch_num=240)
         flush_casia_image([CasiaFile('train/' + name) for name in list_file('casia/train')], 'train')
 
     if data_set.upper() == 'TEST':
         ensure_path('record/test')
-        flush_mnist_image([MnistFile('t10k-images.idx3-ubyte', 't10k-labels.idx1-ubyte')], 'test')
+        flush_mnist_image([MnistFile('t10k-images.idx3-ubyte', 't10k-labels.idx1-ubyte')], 'test', fetch_num=60)
         flush_casia_image([CasiaFile('test/' + name) for name in list_file('casia/test')], 'test')
 
     if data_set.upper() == 'ALL':
         ensure_path('record/all')
-        flush_mnist_image([MnistFile('train-images.idx3-ubyte', 'train-labels.idx1-ubyte'),
-                           MnistFile('t10k-images.idx3-ubyte', 't10k-labels.idx1-ubyte')], 'all')
+        flush_mnist_image([MnistFile('train-images.idx3-ubyte', 'train-labels.idx1-ubyte')], 'all', fetch_num=240)
+        flush_mnist_image([MnistFile('t10k-images.idx3-ubyte', 't10k-labels.idx1-ubyte')], 'all', fetch_num=60)
         flush_casia_image([CasiaFile('train/' + name) for name in list_file('casia/train')] +
                           [CasiaFile('test/' + name) for name in list_file('casia/test')], 'all')
 
