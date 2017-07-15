@@ -131,9 +131,9 @@ def inception(name, *graph, dtype=tf.float32):
 
     node_factory = {
         'conv_1x1':
-            lambda depth, value: convolution('conv_1x1', [3, 3, depth], padding='SAME', dtype=dtype)(value),
+            lambda depth, value: convolution('conv_1x1', [1, 1, depth], padding='SAME', dtype=dtype)(value),
         'conv_3x3':
-            lambda depth, value: convolution('conv_3x3', [5, 5, depth], padding='SAME', dtype=dtype)(value),
+            lambda depth, value: convolution('conv_3x3', [3, 3, depth], padding='SAME', dtype=dtype)(value),
         'conv_5x5':
             lambda depth, value: convolution('conv_5x5', [5, 5, depth], padding='SAME', dtype=dtype)(value),
         'conv_1x7':
