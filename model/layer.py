@@ -141,8 +141,8 @@ def inception(name, *graph, dtype=tf.float32):
         'conv_7x1':
             lambda depth, value: convolution('conv_7x1', [7, 1, depth], padding='SAME', dtype=dtype)(value),
         'pool_3x3':
-            lambda depth, value: pooling('pool_3x3', [3, 3], 'MAX')(
-                convolution('pool_proj', [1, 1, depth], padding='SAME', dtype=dtype)(value)),
+            lambda depth, value: convolution('pool_proj', [1, 1, depth], padding='SAME', dtype=dtype)(
+                                     pooling('pool_3x3', [3, 3], 'MAX')(value)),
     }
 
     def __(value):

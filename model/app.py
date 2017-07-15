@@ -20,8 +20,6 @@ def training_routine(network):
 
     logging.info('Training procedure starting ...')
 
-    log_op = network.summary
-
     step_op = tf.Variable(0, name='global_step', trainable=False)
 
     train_op = tf.train.GradientDescentOptimizer(
@@ -32,10 +30,12 @@ def training_routine(network):
         batch_size=FLAGS.batch_size,
         epoch_num=FLAGS.epoch_num)
 
+    log_op = tf.summary.merge_all()
+
     init_op = tf.group(tf.global_variables_initializer(),
                        tf.local_variables_initializer())
 
-    with tf.Session(config=config) as sess, open(FLAGS.trace_file, 'w') as trace:
+    with tf.Session(config=config) as sess, open(FLAGS.trace_file, 'w') as tracer:
         sess.run(init_op)
 
         saver = tf.train.Saver()
@@ -66,7 +66,7 @@ def training_routine(network):
                     writer.add_summary(summary, global_step=step)
 
                     stats = timeline.Timeline(step_stats=run_meta.step_stats)
-                    trace.write(stats.generate_chrome_trace_format())
+                    tracer.write(stats.generate_chrome_trace_format())
 
                     logging.info('Report step: {}'.format(step))
 
@@ -87,7 +87,7 @@ def training_routine(network):
         logging.info('Total step: {}'.format(sess.run(step_op)))
 
 
-def validation_routine(network):
+def evaluating_routine(network):
 
     logging.info('Test procedure starting ...')
 
@@ -190,8 +190,8 @@ def validation_routine(network):
 
 if __name__ == '__main__':
     network = SquareNet()
-    # training_routine(network)
-    validation_routine(network)
+    training_routine(network)
+    # evaluating_routine(network)
     pass
 
 
