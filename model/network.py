@@ -66,5 +66,4 @@ class SquareNet(object):
 
         tf.summary.scalar('accuracy', self.accuracy)
         tf.summary.scalar('loss', self.loss)
-        self.summary = tf.summary.merge_all()
 

@@ -50,7 +50,7 @@ def convolution(name, k_shape, stride=1, padding='SAME', dtype=tf.float32):
         k_height, k_width, out_channel = k_shape
         in_channel = value.shape.as_list()[-1]
 
-        with tf.variable_scope(name):
+        with tf.name_scope(name):
             shape = [k_height, k_width, in_channel, out_channel]
             fan_in, fan_out = np.prod(shape[:-1]), np.prod(k_shape)
             bound = np.sqrt(6. / (fan_in + fan_out))
@@ -84,7 +84,7 @@ def pooling(name, p_shape, p_type, stride=1, padding='SAME'):
         p_height, p_width, p_depth = p_shape
         assert p_depth == v_depth * 2
 
-        with tf.variable_scope(name):
+        with tf.name_scope(name):
             conv = convolution('conv', [p_height, p_width, p_depth-v_depth],
                                stride=stride, padding=padding)(value)
             pool = pooling('pool', [p_height, p_width], p_type=p_type,
@@ -99,7 +99,7 @@ def density(name, neurons, linear=False, dtype=tf.float32):
     __assert_type(neurons, int)
 
     def __(value):
-        with tf.variable_scope(name):
+        with tf.name_scope(name):
             value = tf.reshape(value, [-1, np.prod(value.shape[1:].as_list())])
 
             shape = value.shape[1:].as_list() + [neurons]
