@@ -5,7 +5,7 @@ import tensorflow as tf
 from tensorflow.python.client import timeline
 
 import data
-from model.network import SquareNet
+from model.network import HCCR_GoogLeNet
 
 
 FLAGS = tf.app.flags.FLAGS
@@ -189,7 +189,7 @@ def evaluating_routine(network):
 
 
 if __name__ == '__main__':
-    network = SquareNet()
+    network = HCCR_GoogLeNet()
     training_routine(network)
     # evaluating_routine(network)
     pass

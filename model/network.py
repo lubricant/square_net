@@ -3,7 +3,7 @@ import tensorflow as tf
 import model.layer as layer
 
 
-class SquareNet(object):
+class HCCR_GoogLeNet(object):
 
     def __init__(self):
         self.__build_network()
@@ -52,7 +52,7 @@ class SquareNet(object):
                                      [('conv_1x1', 160), ('conv_3x3', 320)],
                                      [('conv_1x1', 32), ('conv_5x5', 128)])(self.incp3)
 
-        self.pool4 = layer.pooling('MaxPool_3x3', [5, 5], 'MAX', stride=3)(self.incp4)
+        self.pool4 = layer.pooling('MaxPool_5x5', [5, 5], 'MAX', stride=3)(self.incp4)
         self.conv4 = layer.convolution('Conv_1x1x128', [1, 1, 128])(self.pool4)
         self.logits = layer.density('FC_%d' % FLAGS.label_num, FLAGS.label_num, linear=True)(self.conv4)
 
