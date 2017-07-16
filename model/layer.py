@@ -30,11 +30,11 @@ def loss(name):
         __assert_shape(logits.shape.as_list(), 2)  # batch_size, num_classes = logits.shape
         __assert_shape(labels.shape.as_list(), 1, 2)
 
-        l_func = (tf.nn.softmax_cross_entropy_with_logits  # batch_size, num_classes = labels.shape
-                  if len(labels.shape) == 2 else
-                  tf.nn.sparse_softmax_cross_entropy_with_logits)  # batch_size = labels.shape
+        cross_entropy = (tf.nn.softmax_cross_entropy_with_logits  # batch_size, num_classes = labels.shape
+                         if len(labels.shape) == 2 else
+                         tf.nn.sparse_softmax_cross_entropy_with_logits)  # batch_size = labels.shape
 
-        return tf.reduce_mean(l_func(logits=logits, labels=labels, name=name))
+        return tf.reduce_mean(cross_entropy(logits=logits, labels=labels, name=name))
 
     return __
 

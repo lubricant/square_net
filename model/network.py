@@ -54,7 +54,12 @@ class HCCR_GoogLeNet(object):
 
         self.pool4 = layer.pooling('MaxPool_5x5', [5, 5], 'MAX', stride=3)(self.incp4)
         self.conv4 = layer.convolution('Conv_1x1x128', [1, 1, 128])(self.pool4)
-        self.logits = layer.density('FC_%d' % FLAGS.label_num, FLAGS.label_num, linear=True)(self.conv4)
+
+        self.fc = layer.density('FC_1024', 1024)(self.conv4)
+        self.keep_prob = tf.placeholder(tf.float32, name='keep_prob')
+        self.fc = layer.dropout('Dropout_FC_1024', self.keep_prob)(self.fc)
+
+        self.logits = layer.density('FC_%d' % FLAGS.label_num, FLAGS.label_num, linear=True)(self.fc)
 
         self.loss = layer.loss('Loss')(self.logits, self.labels)
 

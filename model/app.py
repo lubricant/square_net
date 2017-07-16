@@ -23,7 +23,9 @@ def training_routine(network):
     step_op = tf.Variable(0, name='global_step', trainable=False)
 
     train_op = tf.train.GradientDescentOptimizer(
-        learning_rate=FLAGS.learning_rate).minimize(network.loss, global_step=step_op)
+        learning_rate=FLAGS.learning_rate if True else (
+            tf.train.exponential_decay(FLAGS.learning_rate, decay_steps=10, decay_rate=0.9, global_step=step_op)
+        )).minimize(network.loss, global_step=step_op)
 
     queue_op = data.data_queue(
         exec_mode=FLAGS.exec_mode,
