@@ -41,6 +41,14 @@ def training_routine(network):
         saver = tf.train.Saver()
         writer = tf.summary.FileWriter(FLAGS.log_dir, sess.graph)
 
+        logging.info('Loading checkpoint ...')
+        checkpoint = tf.train.get_checkpoint_state(FLAGS.checkpoint_dir)
+        if checkpoint and checkpoint.model_checkpoint_path:
+            saver.restore(sess, checkpoint.model_checkpoint_path)
+            logging.info('Loading checkpoint done')
+        else:
+            logging.info('Loading checkpoint fail')
+
         coord = tf.train.Coordinator()
         threads = tf.train.start_queue_runners(sess=sess, coord=coord)
 
@@ -53,8 +61,8 @@ def training_routine(network):
                 images, labels = sess.run(queue_op)
                 feed_dict = {network.images: images, network.labels: labels}
 
-                step = sess.run(step_op)
-                if not step or step % FLAGS.log_interval:
+                step = sess.run(step_op) + 1
+                if step % FLAGS.log_interval:
                     sess.run(train_op, feed_dict)
                 else:
 
@@ -70,7 +78,7 @@ def training_routine(network):
 
                     logging.info('Report step: {}'.format(step))
 
-                if step and not step % FLAGS.checkpoint_interval:
+                if not step % FLAGS.checkpoint_interval:
                     logging.info('Saving checkpoint {} ...'.format(step//FLAGS.checkpoint_interval))
                     saver.save(sess, FLAGS.checkpoint_file, global_step=step_op)
                     logging.info('Saving checkpoint done')
@@ -102,9 +110,12 @@ def evaluating_routine(network):
     with tf.Session(config=config) as sess:
         sess.run(init_op)
 
+        saver = tf.train.Saver()
+
         logging.info('Loading checkpoint ...')
-        saver = tf.train.Saver(var_list=tf.global_variables() + tf.local_variables())
-        saver.recover_last_checkpoints(FLAGS.checkpoint_dir)
+        checkpoint = tf.train.get_checkpoint_state(FLAGS.checkpoint_dir)
+        assert checkpoint and checkpoint.model_checkpoint_path
+        saver.restore(sess, checkpoint.model_checkpoint_path)
         logging.info('Loading checkpoint done')
 
         coord = tf.train.Coordinator()
@@ -192,6 +203,5 @@ if __name__ == '__main__':
     network = HCCR_GoogLeNet()
     training_routine(network)
     # evaluating_routine(network)
-    pass
 
 
