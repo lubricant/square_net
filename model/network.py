@@ -56,19 +56,42 @@ class HCCR_GoogLeNet(object):
         self.conv4 = layer.convolution('Conv_1x1x128', [1, 1, 128])(self.pool4)
 
         self.fc = layer.density('FC_1024', 1024)(self.conv4)
-        self.keep_prob = tf.placeholder(tf.float32, name='keep_prob')
-        self.fc = layer.dropout('Dropout_FC_1024', self.keep_prob)(self.fc)
+        self.dropout = layer.dropout('Dropout_FC_1024')(self.fc)
+        self.keep_prob = self.dropout.keep_prob
 
-        self.logits = layer.density('FC_%d' % FLAGS.label_num, FLAGS.label_num, linear=True)(self.fc)
+        self.logits = layer.density('FC_%d' % FLAGS.label_num, FLAGS.label_num, linear=True)(self.dropout)
 
         self.loss = layer.loss('Loss')(self.logits, self.labels)
+
+    def __build_summary(self):
+
+        def show_scalar(**args):
+            for name in args:
+                tf.summary.scalar(name, args[name])
+
+        def show_tensor(**args):
+            for name, var in args.items():
+                with tf.name_scope(name):
+                    mean = tf.reduce_mean(var)
+                    stddev = tf.sqrt(tf.reduce_mean(tf.square(var - mean)))
+                    tf.summary.scalar('max', tf.reduce_max(var))
+                    tf.summary.scalar('min', tf.reduce_min(var))
+                    tf.summary.scalar('mean', mean)
+                    tf.summary.scalar('stddev', stddev)
+                    tf.summary.histogram('hist', var)
+
+        def show_variable(*args):
+            pass
 
         with tf.name_scope('Accuracy'):
             self.accuracy = tf.reduce_mean(tf.cast(
                 tf.equal(self.labels, tf.argmax(self.logits, 1)), tf.float32))
 
-    def __build_summary(self):
+        with tf.name_scope('Summary'):
 
-        tf.summary.scalar('accuracy', self.accuracy)
-        tf.summary.scalar('loss', self.loss)
+            show_scalar(loss=self.loss, accuracy=self.accuracy)
 
+            print(self.loss.name)
+
+
+HCCR_GoogLeNet()
