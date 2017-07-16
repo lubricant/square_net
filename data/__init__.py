@@ -11,7 +11,7 @@ __data_path = os.path.abspath(os.path.join(inspect.getfile(this), os.pardir))
 
 NUM_CLASSES = 10 + 3755
 IMG_SIZE, IMG_CHANNEL = 112, 1
-(EM_TRAINING, EM_TEST, EM_MIXING) = ('TRAINING', 'TEST', 'MIXING')
+(DS_TRAIN, DS_TEST, DS_ALL) = ('TRAIN', 'TEST', 'ALL')
 
 
 def get_path(path):
@@ -47,18 +47,18 @@ def label_dict(dict_path='labels_dict.npy'):
     return np.load(get_path(dict_path))
 
 
-def data_queue(exec_mode, batch_size, thread_num=1, epoch_num=None):
+def data_queue(data_set, batch_size, thread_num=1, epoch_num=None):
 
     assert batch_size > 0 and thread_num > 0
 
-    data_set = {
-        'TRAINING': 'record/train',
-        'TEST': 'record/test',
-        'MIXING': 'record/all'}
+    data_repo = {
+        DS_TRAIN: 'record/train',
+        DS_TEST: 'record/test',
+        DS_ALL: 'record/all'}
 
-    assert exec_mode and exec_mode.upper() in data_set
+    assert data_set and data_set.upper() in data_repo
 
-    data_set_dir = data_set[exec_mode.upper()]
+    data_set_dir = data_repo[data_set.upper()]
     filename_queue = tf.train.string_input_producer(
         list(filter(lambda f: os.path.isfile(f), [get_path(data_set_dir + '/' + f) for f in list_file(data_set_dir)])),
         num_epochs=epoch_num)
@@ -113,7 +113,7 @@ if __name__ == '__main__':
             coord.join(threads)
 
     def test_rand_queue():
-        image_batch, label_batch = data_queue(exec_mode=EM_TEST, batch_size=100, epoch_num=1)
+        image_batch, label_batch = data_queue(data_set=DS_TEST, batch_size=100, epoch_num=1)
         init_op = tf.group(tf.initialize_all_variables(),
                            tf.initialize_local_variables())
         with tf.Session() as sess:

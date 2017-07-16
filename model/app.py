@@ -23,12 +23,14 @@ def training_routine(network):
     step_op = tf.Variable(0, name='global_step', trainable=False)
 
     train_op = tf.train.GradientDescentOptimizer(
-        learning_rate=FLAGS.learning_rate if True else (
-            tf.train.exponential_decay(FLAGS.learning_rate, decay_steps=10, decay_rate=0.9, global_step=step_op)
+        learning_rate=FLAGS.learning_rate if not FLAGS.exp_decay else (
+            tf.train.exponential_decay(FLAGS.learning_rate, global_step=step_op,
+                                       decay_steps=FLAGS.decay_interval,
+                                       decay_rate=FLAGS.decay_rate)
         )).minimize(network.loss, global_step=step_op)
 
     queue_op = data.data_queue(
-        exec_mode=FLAGS.exec_mode,
+        data_set=FLAGS.data_set,
         batch_size=FLAGS.batch_size,
         epoch_num=FLAGS.epoch_num)
 
@@ -61,7 +63,9 @@ def training_routine(network):
             while not coord.should_stop():
 
                 images, labels = sess.run(queue_op)
-                feed_dict = {network.images: images, network.labels: labels}
+                feed_dict = {network.images: images,
+                             network.labels: labels,
+                             network.keep_prob: FLAGS.keep_prob}
 
                 step = sess.run(step_op) + 1
                 if step % FLAGS.log_interval:
@@ -102,7 +106,7 @@ def evaluating_routine(network):
     logging.info('Test procedure starting ...')
 
     queue_op = data.data_queue(
-        exec_mode=FLAGS.exec_mode,
+        data_set=FLAGS.data_set,
         batch_size=FLAGS.batch_size,
         epoch_num=1)
 
@@ -134,7 +138,7 @@ def evaluating_routine(network):
             while True:
 
                 images, labels = sess.run(queue_op)
-                logits = sess.run(network.logits, {network.images: images})
+                logits = sess.run(network.logits, {network.images: images, network.keep_prob: 1.})
 
                 inference = np.argmax(logits, axis=-1)
                 assert labels.shape == inference.shape
@@ -203,7 +207,9 @@ def evaluating_routine(network):
 
 if __name__ == '__main__':
     network = HCCR_GoogLeNet()
-    training_routine(network)
-    # evaluating_routine(network)
+    if FLAGS.is_training:
+        training_routine(network)
+    else:
+        evaluating_routine(network)
 
 
