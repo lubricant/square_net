@@ -6,7 +6,8 @@ import model.layer as layer
 class HCCR_GoogLeNet(object):
 
     def __init__(self):
-        self.__build_network()
+        with tf.name_scope('HCCR-GoogLeNet'):
+            self.__build_network()
         self.__build_summary()
 
     def __build_network(self):
@@ -26,13 +27,13 @@ class HCCR_GoogLeNet(object):
         self.norm2 = layer.normalization('LocalRespNorm')(self.conv3)
         self.pool2 = layer.pooling('MaxPool_3x3', [3, 3], 'MAX', stride=2)(self.norm2)
 
-        self.incp1 = layer.inception('Inception_v1',
+        self.incp1 = layer.inception('Inception_v1_1',
                                      [('pool_3x3', 32)],
                                      [('conv_1x1', 64)],
                                      [('conv_1x1', 96), ('conv_3x3', 128)],
                                      [('conv_1x1', 16), ('conv_5x5', 32)])(self.pool2)
 
-        self.incp2 = layer.inception('Inception_v1',
+        self.incp2 = layer.inception('Inception_v1_2',
                                      [('pool_3x3', 64)],
                                      [('conv_1x1', 128)],
                                      [('conv_1x1', 128), ('conv_3x3', 192)],
@@ -40,13 +41,13 @@ class HCCR_GoogLeNet(object):
 
         self.pool3 = layer.pooling('MaxPool_3x3', [3, 3], 'MAX', stride=2)(self.incp2)
 
-        self.incp3 = layer.inception('Inception_v1',
+        self.incp3 = layer.inception('Inception_v1_3',
                                      [('pool_3x3', 64)],
                                      [('conv_1x1', 160)],
                                      [('conv_1x1', 112), ('conv_3x3', 224)],
                                      [('conv_1x1', 24), ('conv_5x5', 64)])(self.pool3)
 
-        self.incp4 = layer.inception('Inception_v1',
+        self.incp4 = layer.inception('Inception_v1_4',
                                      [('pool_3x3', 128)],
                                      [('conv_1x1', 256)],
                                      [('conv_1x1', 160), ('conv_3x3', 320)],
@@ -70,28 +71,37 @@ class HCCR_GoogLeNet(object):
                 tf.summary.scalar(name, args[name])
 
         def show_tensor(**args):
-            for name, var in args.items():
+            for name, val in args.items():
                 with tf.name_scope(name):
-                    mean = tf.reduce_mean(var)
-                    stddev = tf.sqrt(tf.reduce_mean(tf.square(var - mean)))
-                    tf.summary.scalar('max', tf.reduce_max(var))
-                    tf.summary.scalar('min', tf.reduce_min(var))
+                    mean = tf.reduce_mean(val)
+                    stddev = tf.sqrt(tf.reduce_mean(tf.square(val - mean)))
                     tf.summary.scalar('mean', mean)
                     tf.summary.scalar('stddev', stddev)
-                    tf.summary.histogram('hist', var)
+                tf.summary.histogram(name, val)
 
-        def show_variable(*args):
-            pass
+        def show_weight_and_bias(*args):
+            for var in args:
+                with tf.name_scope(var.layer_name):
+                    show_tensor(weight=var.weight, bias=var.bias)
 
-        with tf.name_scope('Accuracy'):
+        def show_branch_graph(*args):
+            for var in args:
+                with tf.name_scope(var.layer_name):
+                    for branch in var.branch_graph:
+                        branch_name = '-'.join(map(lambda x: x[0], branch))
+                        with tf.name_scope(branch_name):
+                            show_weight_and_bias(*map(lambda x: x[1], branch))
+
+        with tf.name_scope('Performance'):
             self.accuracy = tf.reduce_mean(tf.cast(
                 tf.equal(self.labels, tf.argmax(self.logits, 1)), tf.float32))
-
-        with tf.name_scope('Summary'):
-
             show_scalar(loss=self.loss, accuracy=self.accuracy)
 
-            print(self.loss.name)
+        with tf.name_scope('ConvolutionLayer'):
+            show_weight_and_bias(self.conv1, self.conv2, self.conv3, self.conv4)
 
+        with tf.name_scope('InceptionLayer'):
+            show_branch_graph(self.incp1, self.incp2, self.incp3, self.incp4)
 
-HCCR_GoogLeNet()
+        with tf.name_scope('FullyConnectedLayer'):
+            show_weight_and_bias(self.fc, self.logits)

@@ -29,12 +29,12 @@ def training_routine(network):
                                        decay_rate=FLAGS.decay_rate)
         )).minimize(network.loss, global_step=step_op)
 
+    log_op = tf.summary.merge_all()
+
     queue_op = data.data_queue(
         data_set=FLAGS.data_set,
         batch_size=FLAGS.batch_size,
         epoch_num=FLAGS.epoch_num)
-
-    log_op = tf.summary.merge_all()
 
     init_op = tf.group(tf.global_variables_initializer(),
                        tf.local_variables_initializer())
