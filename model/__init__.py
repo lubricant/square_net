@@ -22,18 +22,24 @@ flags.DEFINE_integer('label_num', data.NUM_CLASSES, 'Number of classes.')
 flags.DEFINE_integer('image_size', data.IMG_SIZE, 'Size of image.')
 flags.DEFINE_integer('image_channel', data.IMG_CHANNEL, 'Channel of image.')
 flags.DEFINE_integer('batch_size', 100, 'Batch size of each step.')
-flags.DEFINE_integer('epoch_num', 3, 'Number of epochs to run trainer.')
-flags.DEFINE_integer("thread_num", 1, 'Number of thread to read data.')
+
 flags.DEFINE_integer('decay_interval', 1000, 'Number of step between each exponential decay.')
 flags.DEFINE_integer("log_interval", 100, 'Number of step between each logging.')
 flags.DEFINE_integer("checkpoint_interval", 1000, 'Number of step between each checkpoint.')
 
-flags.DEFINE_string('data_set', data.DS_TRAIN, 'Application execute mode.')
 flags.DEFINE_string('log_dir', data.get_path('tmp/summary'), 'Summaries directory.')
 flags.DEFINE_string('checkpoint_dir', data.get_path('tmp/checkpoint'), 'Checkpoint directory.')
 flags.DEFINE_string('checkpoint_file', data.get_path('tmp/checkpoint/status'), 'Checkpoint file prefix.')
 flags.DEFINE_string('trace_file', data.get_path('tmp/trace.ctf.json'), 'Chrome timeline format file.')
 
+if tf.app.flags.FLAGS.is_training:
+    flags.DEFINE_integer('epoch_num', 3, 'Number of epochs to run trainer.')
+    flags.DEFINE_integer("thread_num", 2, 'Number of thread to read data.')
+    flags.DEFINE_string('data_set', data.DS_TRAIN, 'Application execute mode.')
+else:
+    flags.DEFINE_integer('epoch_num', 1, 'Number of epochs to run trainer.')
+    flags.DEFINE_integer("thread_num", 1, 'Number of thread to read data.')
+    flags.DEFINE_string('data_set', data.DS_TEST, 'Application execute mode.')
 
 '''
     Custom logging config

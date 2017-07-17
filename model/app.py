@@ -16,33 +16,30 @@ config.gpu_options.allow_growth = True
 config.graph_options.optimizer_options.global_jit_level = tf.OptimizerOptions.ON_1
 
 
-def training_routine(network):
+def training_routine(network, queue_op):
 
     logging.info('Training procedure starting ...')
 
-    step_op = tf.Variable(0, name='global_step', trainable=False)
-
-    train_op = tf.train.GradientDescentOptimizer(
-        learning_rate=FLAGS.learning_rate if not FLAGS.exp_decay else (
-            tf.train.exponential_decay(FLAGS.learning_rate, global_step=step_op,
-                                       decay_steps=FLAGS.decay_interval,
-                                       decay_rate=FLAGS.decay_rate)
-        )).minimize(network.loss, global_step=step_op)
-
     log_op = tf.summary.merge_all()
 
-    queue_op = data.data_queue(
-        data_set=FLAGS.data_set,
-        batch_size=FLAGS.batch_size,
-        epoch_num=FLAGS.epoch_num)
+    step_op = tf.Variable(0, name='global_step', trainable=False)
 
-    init_op = tf.group(tf.global_variables_initializer(),
-                       tf.local_variables_initializer())
+    with tf.name_scope('Solver'):
+        train_op = tf.train.GradientDescentOptimizer(
+            learning_rate=FLAGS.learning_rate if not FLAGS.exp_decay else (
+                tf.train.exponential_decay(FLAGS.learning_rate, global_step=step_op,
+                                           decay_steps=FLAGS.decay_interval,
+                                           decay_rate=FLAGS.decay_rate)
+            )).minimize(network.loss, global_step=step_op)
+
+    with tf.name_scope('Initializer'):
+        init_op = tf.group(tf.global_variables_initializer(),
+                           tf.local_variables_initializer())
 
     with tf.Session(config=config) as sess, open(FLAGS.trace_file, 'w') as tracer:
         sess.run(init_op)
 
-        saver = tf.train.Saver()
+        saver = tf.train.Saver(name='Saver')
         writer = tf.summary.FileWriter(FLAGS.log_dir, sess.graph)
 
         logging.info('Loading checkpoint ...')
@@ -51,7 +48,7 @@ def training_routine(network):
             saver.restore(sess, checkpoint.model_checkpoint_path)
             logging.info('Loading checkpoint done')
         else:
-            logging.info('Loading checkpoint fail')
+            logging.info('Loading checkpoint skipped')
 
         coord = tf.train.Coordinator()
         threads = tf.train.start_queue_runners(sess=sess, coord=coord)
@@ -101,17 +98,13 @@ def training_routine(network):
         logging.info('Total step: {}'.format(sess.run(step_op)))
 
 
-def evaluating_routine(network):
+def evaluating_routine(network, queue_op):
 
     logging.info('Test procedure starting ...')
 
-    queue_op = data.data_queue(
-        data_set=FLAGS.data_set,
-        batch_size=FLAGS.batch_size,
-        epoch_num=1)
-
-    init_op = tf.group(tf.global_variables_initializer(),
-                       tf.local_variables_initializer())
+    with tf.name_scope('Initializer'):
+        init_op = tf.group(tf.global_variables_initializer(),
+                           tf.local_variables_initializer())
 
     with tf.Session(config=config) as sess:
         sess.run(init_op)
@@ -206,10 +199,16 @@ def evaluating_routine(network):
 
 
 if __name__ == '__main__':
-    network = HCCR_GoogLeNet()
+    net = HCCR_GoogLeNet()
+    queue = data.data_queue(
+        data_set=FLAGS.data_set,
+        batch_size=FLAGS.batch_size,
+        epoch_num=FLAGS.epoch_num)
+
     if FLAGS.is_training:
-        training_routine(network)
+        training_routine(net, queue)
     else:
-        evaluating_routine(network)
+        evaluating_routine(net, queue)
+
 
 

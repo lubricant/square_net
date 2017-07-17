@@ -58,28 +58,29 @@ def data_queue(data_set, batch_size, thread_num=1, epoch_num=None):
 
     assert data_set and data_set.upper() in data_repo
 
-    data_set_dir = data_repo[data_set.upper()]
-    filename_queue = tf.train.string_input_producer(
-        list(filter(lambda f: os.path.isfile(f), [get_path(data_set_dir + '/' + f) for f in list_file(data_set_dir)])),
-        num_epochs=epoch_num)
+    with tf.name_scope('Queue'):
+        data_set_dir = data_repo[data_set.upper()]
+        filename_queue = tf.train.string_input_producer(
+            list(filter(lambda f: os.path.isfile(f), [get_path(data_set_dir + '/' + f) for f in list_file(data_set_dir)])),
+            num_epochs=epoch_num)
 
-    _, serialized_example = tf.TFRecordReader().read(filename_queue)
-    features = tf.parse_single_example(
-        serialized_example,
-        features={
-            'index': tf.FixedLenFeature([], tf.int64),
-            'image': tf.FixedLenFeature([], tf.string)})
+        _, serialized_example = tf.TFRecordReader().read(filename_queue)
+        features = tf.parse_single_example(
+            serialized_example,
+            features={
+                'index': tf.FixedLenFeature([], tf.int64),
+                'image': tf.FixedLenFeature([], tf.string)})
 
-    labels = tf.cast(features['index'], tf.int32)
-    images = tf.reshape((tf.cast(tf.decode_raw(features['image'], tf.uint8), tf.float32) / 255. - .5),
-                        [IMG_SIZE, IMG_SIZE, IMG_CHANNEL])
+        labels = tf.cast(features['index'], tf.int32)
+        images = tf.reshape((tf.cast(tf.decode_raw(features['image'], tf.uint8), tf.float32) / 255. - .5),
+                            [IMG_SIZE, IMG_SIZE, IMG_CHANNEL])
 
-    rand_data_queue = tf.train.shuffle_batch([images, labels],
-                                             batch_size=batch_size,
-                                             capacity=batch_size * 5,
-                                             min_after_dequeue=batch_size,
-                                             num_threads=thread_num)
-    return rand_data_queue
+        rand_data_queue = tf.train.shuffle_batch([images, labels],
+                                                 batch_size=batch_size,
+                                                 capacity=batch_size * 5,
+                                                 min_after_dequeue=batch_size,
+                                                 num_threads=thread_num)
+        return rand_data_queue
 
 
 if __name__ == '__main__':

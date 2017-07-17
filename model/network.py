@@ -88,9 +88,13 @@ class HCCR_GoogLeNet(object):
             for var in args:
                 with tf.name_scope(var.layer_name):
                     for branch in var.branch_graph:
-                        branch_name = '-'.join(map(lambda x: x[0], branch))
-                        with tf.name_scope(branch_name):
-                            show_weight_and_bias(*map(lambda x: x[1], branch))
+                        if len(branch) == 1:
+                            _, branch_node = branch[0]
+                            show_weight_and_bias(branch_node)
+                        else:
+                            branch_name = '-'.join(map(lambda x: x[0], branch))
+                            with tf.name_scope(branch_name):
+                                show_weight_and_bias(*map(lambda x: x[1], branch))
 
         with tf.name_scope('Performance'):
             self.accuracy = tf.reduce_mean(tf.cast(
