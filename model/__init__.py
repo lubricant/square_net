@@ -21,7 +21,7 @@ flags.DEFINE_float('keep_prob', 0.6, 'Keep probability for training dropout.')
 flags.DEFINE_integer('label_num', data.NUM_CLASSES, 'Number of classes.')
 flags.DEFINE_integer('image_size', data.IMG_SIZE, 'Size of image.')
 flags.DEFINE_integer('image_channel', data.IMG_CHANNEL, 'Channel of image.')
-flags.DEFINE_integer('batch_size', 100, 'Batch size of each step.')
+flags.DEFINE_integer('batch_size', 500, 'Batch size of each step.')
 
 flags.DEFINE_integer('decay_interval', 1000, 'Number of step between each exponential decay.')
 flags.DEFINE_integer("log_interval", 100, 'Number of step between each logging.')
