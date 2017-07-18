@@ -1,3 +1,4 @@
+import re
 import numpy as np
 import tensorflow as tf
 
@@ -24,9 +25,13 @@ def __attach_attr(obj, **args):
 
 
 def __random_init(shape, mode):
-
     __assert_shape(shape, 2, 4)
-    __assert_value(mode.lower(), 'gauss', 'xavier', 'caffe', 'msra')
+
+    gauss_with_opt = re.compile('^gauss:([-+]?[0-9]*\.?[0-9]+)$', re.I)
+    xavier_with_opt = re.compile('^xavier:(in|out|avg)$', re.I)
+
+    if not gauss_with_opt.match(mode) and not xavier_with_opt.match(mode):
+        __assert_value(mode.lower(), 'gauss', 'xavier', 'caffe', 'msra')
 
     mode = mode.lower()
 
@@ -37,19 +42,29 @@ def __random_init(shape, mode):
         fan_in = float(k_size * shape[2])
         fan_out = float(k_size * shape[3])
 
-    if mode == 'gauss':
-        with tf.name_scope('gauss_init'):
-            return tf.truncated_normal(shape, 0.0, 0.01, tf.float32)
-
     if mode == 'msra':
         stddev = 2.0 / fan_in
         trunc_stddev = np.sqrt(1.3 * stddev)
         with tf.name_scope('msra_init'):
             return tf.truncated_normal(shape, 0.0, trunc_stddev, tf.float32)
 
-    n = fan_in if (mode == 'caffe') else ((fan_in + fan_out) / 2.)
-    limit = np.sqrt(3.0 / n)
+    if mode.startswith('gauss'):
+        stddev = gauss_with_opt.findall(mode)
+        stddev = 0.01 if not stddev else float(stddev[0])
+        with tf.name_scope('gauss_init'):
+            return tf.truncated_normal(shape, 0.0, stddev, tf.float32)
 
+    n = 0
+    if mode == 'xavier' or mode.endswith('avg'):
+        mode, n = 'xavier', ((fan_in + fan_out) / 2.)
+
+    if mode == 'caffe' or mode.endswith('in'):
+        mode, n = 'caffe', fan_in
+
+    if mode.endswith('out'):
+        mode, n = 'xavier_fo', fan_out
+
+    limit = np.sqrt(3.0 / n)
     with tf.name_scope('%s_init' % mode):
         return tf.random_uniform(shape, -limit, limit, tf.float32)
 
@@ -78,7 +93,7 @@ def loss(name):
     return __
 
 
-def convolution(name, k_shape, stride=1, padding='SAME', init='xavier'):
+def convolution(name, k_shape, stride=1, padding='VALID', init='xavier'):
     __assert_type(name, str)
     __assert_type(stride, int)
     __assert_value(padding.upper(), 'VALID', 'SAME')
@@ -101,7 +116,7 @@ def convolution(name, k_shape, stride=1, padding='SAME', init='xavier'):
     return __
 
 
-def pooling(name, p_shape, p_type, stride=1, padding='SAME'):
+def pooling(name, p_shape, p_type, stride=1, padding='VALID'):
     __assert_type(name, str)
     __assert_type(p_type, str)
     __assert_type(stride, int)
@@ -149,8 +164,9 @@ def density(name, neurons, linear=False, init='xavier'):
     return __
 
 
-def normalization(name):
-    return lambda value: __attach_attr(tf.nn.local_response_normalization(value, name=name), layer=name)
+def normalization(name, depth_radius=5, alpha=1, beta=0.5):
+    return lambda value: __attach_attr(tf.nn.local_response_normalization(
+        value, depth_radius=depth_radius, alpha=alpha, beta=beta, name=name), layer=name)
 
 
 def dropout(name, **args):
@@ -167,32 +183,34 @@ def inception(name, *graph):
 
     node_factory = {
         'conv_1x1':
-            lambda init, depth, value: convolution('conv_1x1', [1, 1, depth], padding='SAME', init=init)(value),
+            lambda args, depth, value: convolution('conv_1x1', [1, 1, depth], **args)(value),
         'conv_3x3':
-            lambda init, depth, value: convolution('conv_3x3', [3, 3, depth], padding='SAME', init=init)(value),
+            lambda args, depth, value: convolution('conv_3x3', [3, 3, depth], **args)(value),
         'conv_5x5':
-            lambda init, depth, value: convolution('conv_5x5', [5, 5, depth], padding='SAME', init=init)(value),
+            lambda args, depth, value: convolution('conv_5x5', [5, 5, depth], **args)(value),
         'conv_1x7':
-            lambda init, depth, value: convolution('conv_1x7', [1, 7, depth], padding='SAME', init=init)(value),
+            lambda args, depth, value: convolution('conv_1x7', [1, 7, depth], **args)(value),
         'conv_7x1':
-            lambda init, depth, value: convolution('conv_7x1', [7, 1, depth], padding='SAME', init=init)(value),
+            lambda args, depth, value: convolution('conv_7x1', [7, 1, depth], **args)(value),
         'pool_3x3':
-            lambda init, depth, value: convolution('pool_proj', [1, 1, depth], padding='SAME', init=init)(
-                                           pooling('pool_3x3', [3, 3], 'MAX')(value)),
+            lambda args, depth, value: convolution('pool_proj', [1, 1, depth], **args)(
+                                           pooling('pool_3x3', [3, 3], 'MAX', padding='SAME')(value)),
     }
 
     def __(value):
 
         with tf.name_scope(name):
 
+            default_args = {'padding': 'same', 'init': 'xavier'}
+
             node_stack, node_path = [], []
             for pipeline in graph:
                 node, path = value, []
                 for x in pipeline:
                     node_type, node_depth = x[0:2]
-                    node_init = 'xavier' if len(x) <= 2 else x[2]
+                    node_args = default_args if len(x) <= 2 else x[2]
                     assert node_type in node_factory
-                    node = node_factory[node_type](node_init, node_depth, node)
+                    node = node_factory[node_type](node_args, node_depth, node)
                     path.append((node_type, node))
                 node_stack.append(node)
                 node_path.append(path)
