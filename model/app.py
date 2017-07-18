@@ -27,7 +27,7 @@ def training_routine(network, queue_op):
     step_op = tf.Variable(0, name='global_step', trainable=False)
 
     with tf.name_scope('Solver'):
-        train_op = tf.train.GradientDescentOptimizer(
+        train_op = tf.train.AdamOptimizer(
             learning_rate=FLAGS.learning_rate if not FLAGS.exp_decay else (
                 tf.train.exponential_decay(FLAGS.learning_rate, global_step=step_op,
                                            decay_steps=FLAGS.decay_interval,

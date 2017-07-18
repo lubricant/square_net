@@ -18,7 +18,7 @@ class HCCR_GoogLeNet(object):
         self.images = layer.data('Input', [None, FLAGS.image_size, FLAGS.image_size, FLAGS.image_channel])
         self.labels = layer.data('Label', [None], tf.int64)
 
-        self.conv1 = layer.convolution('Conv_7x7x64', [7, 7, 64], 2, init='gauss:0.015')(self.images)
+        self.conv1 = layer.convolution('Conv_7x7x64', [7, 7, 64], 2, random='gauss:0.015')(self.images)
         self.pool1 = layer.pooling('MaxPool_3x3', [3, 3], 'MAX', stride=2)(self.conv1)
         self.norm1 = layer.normalization('LocalRespNorm', alpha=0.0001, beta=0.75)(self.pool1)
 
@@ -30,15 +30,15 @@ class HCCR_GoogLeNet(object):
         self.incp1 = layer.inception('Inception_v1_1',
                                      [('pool_3x3', 32)],
                                      [('conv_1x1', 64)],
-                                     [('conv_1x1', 96), ('conv_3x3', 128, {'init': 'gauss:0.04', 'padding': 'SAME'})],
-                                     [('conv_1x1', 16), ('conv_5x5', 32, {'init': 'gauss:0.08', 'padding': 'SAME'})])(
+                                     [('conv_1x1', 96), ('conv_3x3', 128, {'random': 'gauss:0.04', 'padding': 'SAME'})],
+                                     [('conv_1x1', 16), ('conv_5x5', 32, {'random': 'gauss:0.08', 'padding': 'SAME'})])(
                                      self.pool2)
 
         self.incp2 = layer.inception('Inception_v1_2',
                                      [('pool_3x3', 64)],
                                      [('conv_1x1', 128)],
-                                     [('conv_1x1', 128), ('conv_3x3', 192, {'init': 'gauss:0.04', 'padding': 'SAME'})],
-                                     [('conv_1x1', 32), ('conv_5x5', 96, {'init': 'gauss:0.08', 'padding': 'SAME'})])(
+                                     [('conv_1x1', 128), ('conv_3x3', 192, {'random': 'gauss:0.04', 'padding': 'SAME'})],
+                                     [('conv_1x1', 32), ('conv_5x5', 96, {'random': 'gauss:0.08', 'padding': 'SAME'})])(
                                     self.incp1)
 
         self.pool3 = layer.pooling('MaxPool_3x3', [3, 3], 'MAX', stride=2)(self.incp2)
@@ -46,18 +46,18 @@ class HCCR_GoogLeNet(object):
         self.incp3 = layer.inception('Inception_v1_3',
                                      [('pool_3x3', 64)],
                                      [('conv_1x1', 160)],
-                                     [('conv_1x1', 112), ('conv_3x3', 224, {'init': 'gauss:0.04', 'padding': 'SAME'})],
-                                     [('conv_1x1', 24), ('conv_5x5', 64, {'init': 'gauss:0.08', 'padding': 'SAME'})])(
+                                     [('conv_1x1', 112), ('conv_3x3', 224, {'random': 'gauss:0.04', 'padding': 'SAME'})],
+                                     [('conv_1x1', 24), ('conv_5x5', 64, {'random': 'gauss:0.08', 'padding': 'SAME'})])(
                                      self.pool3)
 
         self.incp4 = layer.inception('Inception_v1_4',
                                      [('pool_3x3', 128)],
                                      [('conv_1x1', 256)],
-                                     [('conv_1x1', 160), ('conv_3x3', 320, {'init': 'gauss:0.04', 'padding': 'SAME'})],
-                                     [('conv_1x1', 32), ('conv_5x5', 128, {'init': 'gauss:0.08', 'padding': 'SAME'})])(
+                                     [('conv_1x1', 160), ('conv_3x3', 320, {'random': 'gauss:0.04', 'padding': 'SAME'})],
+                                     [('conv_1x1', 32), ('conv_5x5', 128, {'random': 'gauss:0.08', 'padding': 'SAME'})])(
                                      self.incp3)
 
-        self.pool4 = layer.pooling('MaxPool_5x5', [5, 5], 'MAX', stride=3)(self.incp4)
+        self.pool4 = layer.pooling('AvgPool_5x5', [5, 5], 'AVG', stride=3)(self.incp4)
         self.conv4 = layer.convolution('Conv_1x1x128', [1, 1, 128])(self.pool4)
 
         self.fc = layer.density('FC_1024', 1024)(self.conv4)

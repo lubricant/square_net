@@ -93,7 +93,7 @@ def loss(name):
     return __
 
 
-def convolution(name, k_shape, stride=1, padding='VALID', init='xavier'):
+def convolution(name, k_shape, stride=1, padding='VALID', random='xavier'):
     __assert_type(name, str)
     __assert_type(stride, int)
     __assert_value(padding.upper(), 'VALID', 'SAME')
@@ -107,7 +107,7 @@ def convolution(name, k_shape, stride=1, padding='VALID', init='xavier'):
         with tf.name_scope(name):
             shape = [k_height, k_width, in_channel, out_channel]
 
-            filt = tf.Variable(__random_init(shape, init), name='filt')
+            filt = tf.Variable(__random_init(shape, random), name='filt')
             conv = tf.nn.conv2d(value, filt, [1, stride, stride, 1], padding.upper())
             bias = tf.Variable(tf.zeros(conv.shape[-1]), name='bias')
             relu = tf.nn.relu(tf.nn.bias_add(conv, bias))
@@ -147,7 +147,7 @@ def pooling(name, p_shape, p_type, stride=1, padding='VALID'):
     return __
 
 
-def density(name, neurons, linear=False, init='xavier'):
+def density(name, neurons, linear=False, random='gauss'):
     __assert_type(name, str)
     __assert_type(neurons, int)
 
@@ -156,7 +156,7 @@ def density(name, neurons, linear=False, init='xavier'):
             value = tf.reshape(value, [-1, np.prod(value.shape[1:].as_list())])
 
             shape = value.shape[1:].as_list() + [neurons]
-            weight = tf.Variable(__random_init(shape, init), name='weight')
+            weight = tf.Variable(__random_init(shape, random), name='weight')
             bias = tf.Variable(tf.zeros([neurons]), name='bias')
             fc = tf.nn.bias_add(tf.matmul(value, weight), bias)
             return __attach_attr(fc if linear else tf.nn.relu(fc), layer_name=name, weight=weight, bias=bias)
@@ -201,7 +201,7 @@ def inception(name, *graph):
 
         with tf.name_scope(name):
 
-            default_args = {'padding': 'same', 'init': 'xavier'}
+            default_args = {'padding': 'same', 'random': 'xavier'}
 
             node_stack, node_path = [], []
             for pipeline in graph:
