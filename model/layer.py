@@ -1,3 +1,4 @@
+import re
 import numpy as np
 import tensorflow as tf
 
@@ -24,9 +25,13 @@ def __attach_attr(obj, **args):
 
 
 def __random_init(shape, mode):
-
     __assert_shape(shape, 2, 4)
-    __assert_value(mode.lower(), 'gauss', 'xavier', 'caffe', 'msra')
+
+    gauss_with_opt = re.compile('^gauss:([-+]?[0-9]*\.?[0-9]+)$', re.I)
+    xavier_with_opt = re.compile('^xavier:(in|out|avg)$', re.I)
+
+    if not gauss_with_opt.match(mode) and not xavier_with_opt.match(mode):
+        __assert_value(mode.lower(), 'gauss', 'xavier', 'caffe', 'msra')
 
     mode = mode.lower()
 
@@ -37,19 +42,30 @@ def __random_init(shape, mode):
         fan_in = float(k_size * shape[2])
         fan_out = float(k_size * shape[3])
 
-    if mode == 'gauss':
-        with tf.name_scope('gauss_init'):
-            return tf.truncated_normal(shape, 0.0, 0.01, tf.float32)
-
     if mode == 'msra':
         stddev = 2.0 / fan_in
         trunc_stddev = np.sqrt(1.3 * stddev)
         with tf.name_scope('msra_init'):
             return tf.truncated_normal(shape, 0.0, trunc_stddev, tf.float32)
 
-    n = fan_in if (mode == 'caffe') else ((fan_in + fan_out) / 2.)
-    limit = np.sqrt(3.0 / n)
+    if mode.startswith('gauss'):
+        stddev = gauss_with_opt.findall(mode)
+        stddev = 0.01 if not stddev else float(stddev[0])
+        with tf.name_scope('gauss_init'):
+            return tf.truncated_normal(shape, 0.0, stddev, tf.float32)
 
+    n = 0
+    if mode == 'xavier' or mode.endswith('avg'):
+        n = ((fan_in + fan_out) / 2.)
+        mode = 'xavier'
+    if mode == 'caffe' or mode.endswith('in'):
+        n = fan_in
+        mode = 'caffe'
+    if mode.endswith('out'):
+        n = fan_out
+        mode = 'xavier_fan_out'
+
+    limit = np.sqrt(3.0 / n)
     with tf.name_scope('%s_init' % mode):
         return tf.random_uniform(shape, -limit, limit, tf.float32)
 
