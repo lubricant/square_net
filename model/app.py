@@ -2,7 +2,9 @@ import logging
 
 import numpy as np
 import tensorflow as tf
+from tensorflow.python import gfile as gf
 from tensorflow.python.client import timeline
+
 
 import data
 from model.network import HCCR_GoogLeNet
@@ -199,6 +201,18 @@ def evaluating_routine(network, queue_op):
 
 
 if __name__ == '__main__':
+
+    def prepare_dir():
+        logging.info('Preparing Dir ...')
+
+        if not gf.Exists(FLAGS.checkpoint_dir):
+            gf.MakeDirs(FLAGS.checkpoint_dir)
+
+        if not gf.Exists(FLAGS.log_dir):
+            gf.MakeDirs(FLAGS.log_dir)
+
+        logging.info('Preparing Dir done')
+
     net = HCCR_GoogLeNet()
     queue = data.data_queue(
         data_set=FLAGS.data_set,
@@ -206,6 +220,7 @@ if __name__ == '__main__':
         epoch_num=FLAGS.epoch_num)
 
     if FLAGS.is_training:
+        prepare_dir()
         training_routine(net, queue)
     else:
         evaluating_routine(net, queue)
