@@ -104,8 +104,9 @@ if __name__ == '__main__':
     _, img = next(iter(CasiaFile('train/1001-c.gnt')))
     slid = None
 
-    def update_distort(k=0):
-        trans = Distort(k)
+    def update_distort(factor=1):
+        trans = Distort(a=factor)  # Distort(k=factor)
+
         plt.subplot(3, 4, 1)
         plt.title('LEFT')
         plt.imshow(trans.transform(img, Distort.DT_LEFT), cmap='gray')
@@ -163,11 +164,11 @@ if __name__ == '__main__':
 
 
     if True:
-        update = update_deform
+        update = update_deform  # 1.85
         slid = Slider(plt.subplot(3, 1, 3), 'eta', 0.001, 5.0, valinit=1)
     else:
-        update = update_distort
-        slid = Slider(plt.subplot(3, 1, 3), 'k', -2, 2, valinit=1)
+        update = update_distort  # a = 1.3, k = 0
+        slid = Slider(plt.subplot(3, 1, 3), 'a', -2, 2, valinit=1)
 
     update()
     slid.on_changed(update)

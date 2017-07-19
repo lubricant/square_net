@@ -52,7 +52,7 @@ def prepare_label_dict(dict_path='tmp/labels_dict.npy'):
     logging.info('Finish preparing label dict.')
 
 
-def prepare_image_files(file_name, data_set, img_per_file=100000, dict_path='labels_dict.npy', img_filter=lambda _: _):
+def prepare_image_files(file_name, data_set, img_per_file=150000, dict_path='labels_dict.npy', img_filter=lambda _: _):
     '''
     将原始图片文件转换为 TFRecord 格式的文件
     '''
@@ -93,29 +93,57 @@ def prepare_image_files(file_name, data_set, img_per_file=100000, dict_path='lab
                 digits_cnt[digit] += 1
                 flush_image(digit, img, file_dir)
 
-    def flush_casia_image(file_list, file_dir):
+    def flush_casia_image(file_list, file_dir, img_transfer=None):
         for file in file_list:
-            for record in file:
-                flush_image(*record, file_dir)
+            for ch, img in file:
+                flush_image(ch, img, file_dir)
+                if img_transfer:
+                    for trans in img_transfer:
+                        t_img = trans.transform(img)
+                        assert t_img.shape == img.shape
+                        flush_image(ch, t_img, file_dir)
 
     assert data_set.upper() in ('TRAINING', 'TEST', 'ALL')
 
+    factor_18 = [DT.DT_TOP, DT.DT_BOTTOM, DT.DT_LEFT, DT.DT_RIGHT,
+                 DT.DT_TOP | DT.DT_LEFT, DT.DT_TOP | DT.DT_RIGHT,
+                 DT.DT_BOTTOM | DT.DT_LEFT, DT.DT_BOTTOM, DT.DT_RIGHT,
+                 DT.DT_HORIZON_EXPAND, DT.DT_HORIZON_SHRINK,
+                 DT.DT_VERTICAL_EXPAND, DT.DT_VERTICAL_SHRINK]
+
+    factor_15 = [DT.DT_HORIZON_EXPAND | DT.DT_VERTICAL_EXPAND,
+                 DT.DT_HORIZON_EXPAND | DT.DT_VERTICAL_SHRINK,
+                 DT.DT_HORIZON_SHRINK | DT.DT_VERTICAL_EXPAND,
+                 DT.DT_HORIZON_SHRINK | DT.DT_VERTICAL_SHRINK]
+
+    trans_18, trans_15 = Deform(1.85), Deform(1.5)
+
+    transfer_list = ([lambda im: trans_18.transform(im, flag) for flag in factor_18] +
+                     [lambda im: trans_15.transform(im, flag) for flag in factor_15])
+
+    extra_img_num = len(transfer_list)
+
     if data_set.upper() == 'TRAINING':
         ensure_path('record/train')
-        flush_mnist_image([MnistFile('train-images.idx3-ubyte', 'train-labels.idx1-ubyte')], 'train', fetch_num=240)
-        flush_casia_image([CasiaFile('train/' + name) for name in list_file('casia/train')], 'train')
+        flush_mnist_image([MnistFile('train-images.idx3-ubyte', 'train-labels.idx1-ubyte')], 'train',
+                          fetch_num=240 * (1 + extra_img_num))
+        flush_casia_image([CasiaFile('train/' + name) for name in list_file('casia/train')], 'train',
+                          img_transfer=transfer_list)
 
     if data_set.upper() == 'TEST':
         ensure_path('record/test')
         flush_mnist_image([MnistFile('t10k-images.idx3-ubyte', 't10k-labels.idx1-ubyte')], 'test', fetch_num=60)
-        flush_casia_image([CasiaFile('test/' + name) for name in list_file('casia/test')], 'test')
+        flush_casia_image([CasiaFile('test/' + name) for name in list_file('casia/test')], 'test',)
 
     if data_set.upper() == 'ALL':
         ensure_path('record/all')
-        flush_mnist_image([MnistFile('train-images.idx3-ubyte', 'train-labels.idx1-ubyte')], 'all', fetch_num=240)
-        flush_mnist_image([MnistFile('t10k-images.idx3-ubyte', 't10k-labels.idx1-ubyte')], 'all', fetch_num=60)
+        flush_mnist_image([MnistFile('train-images.idx3-ubyte', 'train-labels.idx1-ubyte')], 'all',
+                          fetch_num=240 * (1 + extra_img_num))
+        flush_mnist_image([MnistFile('t10k-images.idx3-ubyte', 't10k-labels.idx1-ubyte')], 'all',
+                          fetch_num=60 * (1 + extra_img_num))
         flush_casia_image([CasiaFile('train/' + name) for name in list_file('casia/train')] +
-                          [CasiaFile('test/' + name) for name in list_file('casia/test')], 'all')
+                          [CasiaFile('test/' + name) for name in list_file('casia/test')], 'all',
+                          img_transfer=transfer_list)
 
     [w.close() for w in img_writer]
 
