@@ -1,6 +1,7 @@
 
 import logging
 
+from data.dt_trans import *
 from data.fmt_file import *
 
 '''
@@ -99,7 +100,7 @@ def prepare_image_files(file_name, data_set, img_per_file=150000, dict_path='lab
                 flush_image(ch, img, file_dir)
                 if img_transfer:
                     for trans in img_transfer:
-                        t_img = trans.transform(img)
+                        t_img = trans(img)
                         assert t_img.shape == img.shape
                         flush_image(ch, t_img, file_dir)
 
@@ -159,7 +160,7 @@ if __name__ == '__main__':
     resize = lambda x: filter.filter(x)
 
     # prepare_label_dict()
-    # prepare_image_files('training_set_%d.tfr', data_set='TRAINING', img_filter=resize)
+    prepare_image_files('training_set_%d.tfr', data_set='TRAINING', img_filter=resize)
     # prepare_image_files('test_set_%d.tfr', data_set='TEST', img_filter=resize)
     # prepare_image_files('mixing_set_%d.tfr', data_set='ALL', img_filter=resize)
 
