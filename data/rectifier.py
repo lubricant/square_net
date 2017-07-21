@@ -106,9 +106,10 @@ def prepare_image_files(file_name, data_set, img_per_file=150000, dict_path='lab
 
     assert data_set.upper() in ('TRAINING', 'TEST', 'ALL')
 
-    factor_18 = [DT.DT_TOP, DT.DT_BOTTOM, DT.DT_LEFT, DT.DT_RIGHT,
-                 DT.DT_TOP | DT.DT_LEFT, DT.DT_TOP | DT.DT_RIGHT,
-                 DT.DT_BOTTOM | DT.DT_LEFT, DT.DT_BOTTOM, DT.DT_RIGHT,
+    factor_33 = [DT.DT_TOP, DT.DT_LEFT, DT.DT_TOP | DT.DT_LEFT]
+
+    factor_19 = [DT.DT_BOTTOM,  DT.DT_RIGHT, DT.DT_TOP | DT.DT_RIGHT,
+                 DT.DT_BOTTOM | DT.DT_LEFT, DT.DT_BOTTOM | DT.DT_RIGHT,
                  DT.DT_HORIZON_EXPAND, DT.DT_HORIZON_SHRINK,
                  DT.DT_VERTICAL_EXPAND, DT.DT_VERTICAL_SHRINK]
 
@@ -117,10 +118,11 @@ def prepare_image_files(file_name, data_set, img_per_file=150000, dict_path='lab
                  DT.DT_HORIZON_SHRINK | DT.DT_VERTICAL_EXPAND,
                  DT.DT_HORIZON_SHRINK | DT.DT_VERTICAL_SHRINK]
 
-    trans_18, trans_15 = Deform(1.85), Deform(1.5)
+    trans_33, trans_19, trans_15 = Deform(3.3), Deform(1.95), Deform(1.6)
 
-    transfer_list = ([lambda im: trans_18.transform(im, flag) for flag in factor_18] +
-                     [lambda im: trans_15.transform(im, flag) for flag in factor_15])
+    transfer_list = ([lambda im, f=flag: trans_33.transform(im, f) for flag in factor_33] +
+                     [lambda im, f=flag: trans_19.transform(im, f) for flag in factor_19] +
+                     [lambda im, f=flag: trans_15.transform(im, f) for flag in factor_15])
 
     extra_img_num = len(transfer_list)
 
