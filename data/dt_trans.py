@@ -13,7 +13,7 @@ class DT(object):
     _top, _bottom = None, None
     _shrink, _expand = None, None
 
-    def transform(self, image, flag):
+    def transform(self, image, flag, out=None):
 
         horizon, vertical = flag & 0x7, flag & 0x38
         horizon_dt, vertical_dt = None, None
@@ -43,7 +43,13 @@ class DT(object):
         rows, cols = image.shape
         y_dt = [prepare(y, rows, vertical_dt) for y in range(0, rows)]
         x_dt = [prepare(x, cols, horizon_dt) for x in range(0, cols)]
-        image_dt = np.zeros(image.shape)
+
+        if out is None:
+            image_dt = np.zeros(image.shape)
+        else:
+            assert out.shape == image.shape
+            image_dt = out
+
         for y in range(0, rows):
             for x in range(0, cols):
                 image_dt[y, x] = image[y_dt[y], x_dt[x]]

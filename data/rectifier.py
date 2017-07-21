@@ -53,7 +53,7 @@ def prepare_label_dict(dict_path='tmp/labels_dict.npy'):
     logging.info('Finish preparing label dict.')
 
 
-def prepare_image_files(file_name, data_set, img_per_file=150000, dict_path='labels_dict.npy', img_filter=lambda _: _):
+def prepare_image_files(file_name, data_set, img_per_file=250000, dict_path='labels_dict.npy', img_filter=lambda _: _):
     '''
     将原始图片文件转换为 TFRecord 格式的文件
     '''
@@ -71,6 +71,8 @@ def prepare_image_files(file_name, data_set, img_per_file=150000, dict_path='lab
 
         writer_id = img_cnt[0] // img_per_file
         if not img_cnt[0] % img_per_file:
+            if writer_id:
+                img_writer[writer_id-1].close()
             img_writer.append(TFRecordFile((file_dir + '/' + file_name) % writer_id, id_mapping))
             assert writer_id == len(img_writer) - 1
 
@@ -78,31 +80,55 @@ def prepare_image_files(file_name, data_set, img_per_file=150000, dict_path='lab
         img_cnt[0] += 1
 
     def flush_mnist_image(file_list, file_dir, fetch_num):
+
+        logging.info('Expect MNIST image: {}[{}x{}]'.format(fetch_num*10, 10,  fetch_num))
+
         for file in file_list:
             for digit, img in file:
 
                 if not len(digits_cnt.keys()):
+                    logging.info('Enough MNIST image')
                     return
 
                 if digit not in digits_cnt:
                     continue
 
                 if digits_cnt[digit] == fetch_num:
+                    logging.info('digit {} has fetch enough'.format(digit))
                     del digits_cnt[digit]
                     continue
 
                 digits_cnt[digit] += 1
                 flush_image(digit, img, file_dir)
 
+        logging.error('Not enough MNIST image: {}'.format(['%d:%d' % (
+            d, fetch_num-digits_cnt[d] if d in digits_cnt else fetch_num) for d in range(10)]))
+
     def flush_casia_image(file_list, file_dir, img_transfer=None):
+
+        file_num = len(file_list)
+        extra_num = 1 if not img_transfer else len(img_transfer)
+        logging.info('Expect CASIA image: {}[{}x{}x{}]'.format(
+            3755*file_num*extra_num, 3755, file_num, extra_num))
+
+        total_ch_num = 0
         for file in file_list:
+            ch_num = 0
             for ch, img in file:
                 flush_image(ch, img, file_dir)
+                ch_num += 1
                 if img_transfer:
+                    img_out = np.zeros(img.shape)
+                    ch_num += len(img_transfer)
                     for trans in img_transfer:
-                        t_img = trans(img)
+                        t_img = trans(img, img_out)
                         assert t_img.shape == img.shape
                         flush_image(ch, t_img, file_dir)
+
+            total_ch_num += ch_num
+            logging.info('got {} from file {}'.format(ch_num, file.name))
+
+        logging.info('Total CASIA image: {}'.format(total_ch_num))
 
     assert data_set.upper() in ('TRAINING', 'TEST', 'ALL')
 
@@ -120,9 +146,9 @@ def prepare_image_files(file_name, data_set, img_per_file=150000, dict_path='lab
 
     trans_33, trans_19, trans_15 = Deform(3.3), Deform(1.95), Deform(1.6)
 
-    transfer_list = ([lambda im, f=flag: trans_33.transform(im, f) for flag in factor_33] +
-                     [lambda im, f=flag: trans_19.transform(im, f) for flag in factor_19] +
-                     [lambda im, f=flag: trans_15.transform(im, f) for flag in factor_15])
+    transfer_list = ([lambda im, out, f=flag: trans_33.transform(im, f, out) for flag in factor_33] +
+                     [lambda im, out, f=flag: trans_19.transform(im, f, out) for flag in factor_19] +
+                     [lambda im, out, f=flag: trans_15.transform(im, f, out) for flag in factor_15])
 
     extra_img_num = len(transfer_list)
 
@@ -148,12 +174,15 @@ def prepare_image_files(file_name, data_set, img_per_file=150000, dict_path='lab
                           [CasiaFile('test/' + name) for name in list_file('casia/test')], 'all',
                           img_transfer=transfer_list)
 
-    [w.close() for w in img_writer]
-
-    logging.info('Finish preparing image file.')
+    logging.info('Finish preparing image file')
 
 
 if __name__ == '__main__':
+    import sys
+    logging.basicConfig(level=logging.DEBUG,
+                        format='[%(asctime)s] %(message)s',
+                        datefmt='%Y-%m-%d %H:%M:%S',
+                        stream=sys.stdout)
 
     from data.cv_filter import *
     from data import IMG_SIZE

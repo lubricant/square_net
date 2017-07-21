@@ -5,7 +5,16 @@ import numpy as np
 from data import *
 
 
-class MnistFile(object):
+class File(object):
+
+    def __init__(self, filename):
+        assert filename
+        self._filename = filename
+
+    name = property(lambda self: self._filename, None, None)
+
+
+class MnistFile(File):
 
     '''
     MNIST 手写数字数据集
@@ -15,6 +24,7 @@ class MnistFile(object):
     '''
 
     def __init__(self, image_filename, label_filename, reverse_pixel=False):
+        super().__init__((image_filename, label_filename))
         assert exist_path('mnist/' + image_filename) and \
                exist_path('mnist/' + label_filename)
         self.__img_filepath = 'mnist/' + image_filename
@@ -53,7 +63,7 @@ class MnistFile(object):
             yield str(ch), img
 
 
-class CasiaFile(object):
+class CasiaFile(File):
 
     '''
     Casia 手写中文数据集
@@ -63,6 +73,7 @@ class CasiaFile(object):
     '''
 
     def __init__(self, filename, reverse_pixel=True):
+        super().__init__(filename)
         assert exist_path('casia/' + filename)
         self.__filepath = 'casia/' + filename
         self.__reverse = reverse_pixel
@@ -84,7 +95,7 @@ class CasiaFile(object):
             yield (data_tag, data_img)
 
 
-class TFRecordFile(object):
+class TFRecordFile(File):
 
     '''
     TFRecord 转换器
@@ -92,7 +103,8 @@ class TFRecordFile(object):
     '''
 
     def __init__(self, filename, dict_map=None):
-        assert filename
+        super().__init__(filename)
+
         self.__dict_map = dict_map
         self.__filepath = 'record/' + filename
         self.__tfwriter = None
