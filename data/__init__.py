@@ -55,19 +55,24 @@ def data_queue(data_set, batch_size, thread_num=1, epoch_num=None):
     assert batch_size > 0 and thread_num > 0
 
     data_repo = {
-        DS_TRAIN: '/record/train/',
-        DS_TEST: '/record/test/',
-        DS_ALL: '/record/all/'}
+        DS_TRAIN: ['F:/record/train/', 'G:/record/train/'],
+        DS_TEST: [],
+        DS_ALL: []}
 
     assert data_set and data_set.upper() in data_repo
 
     with tf.name_scope('Queue'):
-        data_set_dir = RECORD_ROOT + data_repo[data_set.upper()]
-        assert gf.Exists(data_set_dir)
+        data_set_file = []
+        data_set_list = data_repo[data_set.upper()]
+
+        assert data_set_list
+        for data_set in data_set_list:
+            assert gf.Exists(data_set) and \
+                   gf.IsDirectory(data_set)
+            data_set_file += [data_set + f for f in gf.ListDirectory(data_set)]
 
         filename_queue = tf.train.string_input_producer(
-            list(filter(lambda f: os.path.isfile(f), [
-                data_set_dir + f for f in gf.ListDirectory(data_set_dir)])),
+            list(filter(lambda f: os.path.isfile(f), set(data_set_file))),
             num_epochs=epoch_num)
 
         _, serialized_example = tf.TFRecordReader().read(filename_queue)
