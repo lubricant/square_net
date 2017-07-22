@@ -1,6 +1,7 @@
 import struct
 
 import numpy as np
+from tensorflow.python import gfile as gf
 
 from data import *
 
@@ -25,15 +26,16 @@ class MnistFile(File):
 
     def __init__(self, image_filename, label_filename, reverse_pixel=False):
         super().__init__((image_filename, label_filename))
-        assert exist_path('mnist/' + image_filename) and \
-               exist_path('mnist/' + label_filename)
-        self.__img_filepath = 'mnist/' + image_filename
-        self.__lab_filepath = 'mnist/' + label_filename
+
+        assert gf.Exists(PWD + '/mnist/' + image_filename) and \
+               gf.Exists(PWD + '/mnist/' + label_filename)
+        self.__img_filepath = PWD + '/mnist/' + image_filename
+        self.__lab_filepath = PWD + '/mnist/' + label_filename
         self.__reverse = reverse_pixel
 
     def __iter__(self):
-        img_file = open(get_path(self.__img_filepath), 'rb')
-        lab_file = open(get_path(self.__lab_filepath), 'rb')
+        img_file = gf.Open(self.__img_filepath, 'rb')
+        lab_file = gf.Open(self.__lab_filepath, 'rb')
         img_buf, lab_buf = img_file.read(), lab_file.read()
 
         def read_img():
@@ -74,14 +76,15 @@ class CasiaFile(File):
 
     def __init__(self, filename, reverse_pixel=True):
         super().__init__(filename)
-        assert exist_path('casia/' + filename)
-        self.__filepath = 'casia/' + filename
+        assert gf.Exists(PWD + '/casia/' + filename)
+        self.__filepath = PWD + '/casia/' + filename
         self.__reverse = reverse_pixel
 
     def __iter__(self):
 
-        size = get_size(self.__filepath)
-        file = open(get_path(self.__filepath), 'rb')
+        assert not gf.IsDirectory(self.__filepath)
+        size = os.path.getsize(self.__filepath)
+        file = open(self.__filepath, 'rb')
 
         while file.tell() < size:
             length, = struct.unpack('<I', file.read(4))
@@ -104,14 +107,14 @@ class TFRecordFile(File):
 
     def __init__(self, filename, dict_map=None):
         super().__init__(filename)
-
+        assert gf.Exists(RECORD_ROOT + '/record/')
         self.__dict_map = dict_map
-        self.__filepath = 'record/' + filename
+        self.__filepath = RECORD_ROOT + '/record/' + filename
         self.__tfwriter = None
 
     def __iter__(self):
-        assert exist_path(self.__filepath)
-        for serialized_example in tf.python_io.tf_record_iterator(get_path(self.__filepath)):
+        assert gf.Exists(self.__filepath)
+        for serialized_example in tf.python_io.tf_record_iterator(self.__filepath):
             example = tf.train.Example()
             example.ParseFromString(serialized_example)
 
@@ -129,9 +132,8 @@ class TFRecordFile(File):
             isinstance(dict_map[ch], int))
 
         if not self.__tfwriter:
-            if not exist_path('record'):
-                ensure_path('record')
-            self.__tfwriter = tf.python_io.TFRecordWriter(get_path(self.__filepath))
+            assert gf.Exists(RECORD_ROOT + '/record/')
+            self.__tfwriter = tf.python_io.TFRecordWriter(self.__filepath)
 
         writer = self.__tfwriter
         example = tf.train.Example(features=tf.train.Features(feature={
@@ -151,7 +153,7 @@ class TFRecordFile(File):
 
 if __name__ == '__main__':
 
-    def mnist_test():
+    def try_mnist():
         cnt = 0
         ch_map = {}
         # for ch, img in MnistFile('train-images.idx3-ubyte', 'train-labels.idx1-ubyte'):
@@ -166,10 +168,10 @@ if __name__ == '__main__':
         print(cnt)
         print(str(ch_map))
 
-    def casi_test():
+    def try_casi():
         cnt = 0
         ch_map = {}
-        for name in list_file('casia/test'):
+        for name in gf.ListDirectory(PWD + '/casia/test'):
             for ch, img in CasiaFile('test/'+name):
                 cnt += 1
                 if ch not in ch_map:
@@ -181,5 +183,5 @@ if __name__ == '__main__':
         print(cnt)
         print(str(ch_map))
 
-    # mnist_test()
-    # casi_test()
+    # try_mnist()
+    # try_casi()

@@ -11,10 +11,12 @@ data
 |   |----train：[CASIA 训练集文件 (.gnt)]
 |   |----test： [CASIA 测试集文件 (.gnt)]
 |----mnist：    [MNIST 所有文件] 
+
+RECORD_ROOT     [任意一个磁盘目录]
 |----record:    [留空]
 |   |----train：[TFRecord 格式训练集文件 (.tfr)]
 |   |----test： [TFRecord 格式测试集文件 (.tfr)]
-|   |----mix：  [TFRecord 格式数据集文件 (.tfr)]
+|   |----all：  [TFRecord 格式数据集文件 (.tfr)]
 |----tmp:       [留空]
 '''
 
@@ -46,9 +48,9 @@ def prepare_label_dict(dict_path='tmp/labels_dict.npy'):
     logging.info('Start preparing label dict ......')
 
     ch_mapping, id_mapping = build_label_mapping(
-        [CasiaFile('test/' + name) for name in list_file('casia/test')])
+        [CasiaFile('test/' + name) for name in gf.ListDirectory(PWD + '/casia/test')])
 
-    np.save(get_path(dict_path), (ch_mapping, id_mapping))
+    np.save(PWD + '/' + dict_path, (ch_mapping, id_mapping))
 
     logging.info('Finish preparing label dict.')
 
@@ -94,7 +96,7 @@ def prepare_image_files(file_name, data_set, img_per_file=250000, dict_path='lab
                     continue
 
                 if digits_cnt[digit] == fetch_num:
-                    logging.info('digit {} has fetch enough'.format(digit))
+                    logging.info('fetched enough digit {}'.format(digit))
                     del digits_cnt[digit]
                     continue
 
@@ -152,26 +154,31 @@ def prepare_image_files(file_name, data_set, img_per_file=250000, dict_path='lab
 
     extra_img_num = len(transfer_list)
 
+    def ensure_dir(dirname):
+        if gf.Exists(RECORD_ROOT + dirname):
+            gf.DeleteRecursively(RECORD_ROOT + dirname)
+        gf.MakeDirs(RECORD_ROOT + dirname)
+
     if data_set.upper() == 'TRAINING':
-        ensure_path('record/train')
+        ensure_dir('/record/train')
         flush_mnist_image([MnistFile('train-images.idx3-ubyte', 'train-labels.idx1-ubyte')], 'train',
                           fetch_num=240 * (1 + extra_img_num))
-        flush_casia_image([CasiaFile('train/' + name) for name in list_file('casia/train')], 'train',
+        flush_casia_image([CasiaFile('train/' + name) for name in gf.ListDirectory(PWD + '/casia/train')], 'train',
                           img_transfer=transfer_list)
 
     if data_set.upper() == 'TEST':
-        ensure_path('record/test')
+        ensure_dir('/record/test')
         flush_mnist_image([MnistFile('t10k-images.idx3-ubyte', 't10k-labels.idx1-ubyte')], 'test', fetch_num=60)
-        flush_casia_image([CasiaFile('test/' + name) for name in list_file('casia/test')], 'test',)
+        flush_casia_image([CasiaFile('test/' + name) for name in gf.ListDirectory(PWD + '/casia/test')], 'test',)
 
     if data_set.upper() == 'ALL':
-        ensure_path('record/all')
+        ensure_dir('/record/all')
         flush_mnist_image([MnistFile('train-images.idx3-ubyte', 'train-labels.idx1-ubyte')], 'all',
                           fetch_num=240 * (1 + extra_img_num))
         flush_mnist_image([MnistFile('t10k-images.idx3-ubyte', 't10k-labels.idx1-ubyte')], 'all',
                           fetch_num=60 * (1 + extra_img_num))
-        flush_casia_image([CasiaFile('train/' + name) for name in list_file('casia/train')] +
-                          [CasiaFile('test/' + name) for name in list_file('casia/test')], 'all',
+        flush_casia_image([CasiaFile('train/' + name) for name in gf.ListDirectory(PWD + '/casia/train')] +
+                          [CasiaFile('test/' + name) for name in gf.ListDirectory(PWD + '/casia/test')], 'all',
                           img_transfer=transfer_list)
 
     logging.info('Finish preparing image file')

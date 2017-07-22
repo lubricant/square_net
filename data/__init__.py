@@ -2,49 +2,52 @@ import inspect
 import os
 import shutil
 
+import numpy as np
 import tensorflow as tf
+from tensorflow.python import gfile as gf
 
 import data as this
 
-__data_path = os.path.abspath(os.path.join(inspect.getfile(this), os.pardir))
-
+PWD = os.path.abspath(os.path.join(inspect.getfile(this), os.pardir)).replace('\\', '/')
+RECORD_ROOT = 'H:/data_set'
 
 NUM_CLASSES = 10 + 3755
 IMG_SIZE, IMG_CHANNEL = 112, 1
 (DS_TRAIN, DS_TEST, DS_ALL) = ('TRAIN', 'TEST', 'ALL')
 
 
-def get_path(path):
-    path = path.replace('/', os.path.sep)
-    if not path.startswith(os.path.sep):
-        path = os.path.sep + path
-    return __data_path + path
-
-
-def get_size(path):
-    filename = get_path(path)
-    assert os.path.isfile(filename)
-    return os.path.getsize(filename)
-
-
-def list_file(path):
-    filename = get_path(path)
-    assert os.path.isdir(filename)
-    return os.listdir(filename)
-
-
-def exist_path(path):
-    return os.path.exists(get_path(path))
-
-
-def ensure_path(path):
-    if exist_path(path):
-        shutil.rmtree(get_path(path))
-    os.mkdir(get_path(path))
+# def get_path(path):
+#     path = path.replace('/', os.path.sep)
+#     if not path.startswith(os.path.sep):
+#         path = os.path.sep + path
+#     return PWD + path
+#
+#
+# def get_size(path):
+#     filename = get_path(path)
+#     assert os.path.isfile(filename)
+#     return os.path.getsize(filename)
+#
+#
+# def list_file(path):
+#     filename = get_path(path)
+#     assert os.path.isdir(filename)
+#     return os.listdir(filename)
+#
+#
+# def exist_path(path):
+#     return os.path.exists(get_path(path))
+#
+#
+# def ensure_path(path):
+#     if exist_path(path):
+#         shutil.rmtree(get_path(path))
+#     os.mkdir(get_path(path))
 
 
 def label_dict(dict_path='labels_dict.npy'):
-    return np.load(get_path(dict_path))
+
+    return np.load(PWD + '/' + dict_path)
 
 
 def data_queue(data_set, batch_size, thread_num=1, epoch_num=None):
@@ -52,16 +55,19 @@ def data_queue(data_set, batch_size, thread_num=1, epoch_num=None):
     assert batch_size > 0 and thread_num > 0
 
     data_repo = {
-        DS_TRAIN: 'record/train',
-        DS_TEST: 'record/test',
-        DS_ALL: 'record/all'}
+        DS_TRAIN: '/record/train/',
+        DS_TEST: '/record/test/',
+        DS_ALL: '/record/all/'}
 
     assert data_set and data_set.upper() in data_repo
 
     with tf.name_scope('Queue'):
-        data_set_dir = data_repo[data_set.upper()]
+        data_set_dir = RECORD_ROOT + data_repo[data_set.upper()]
+        assert gf.Exists(data_set_dir)
+
         filename_queue = tf.train.string_input_producer(
-            list(filter(lambda f: os.path.isfile(f), [get_path(data_set_dir + '/' + f) for f in list_file(data_set_dir)])),
+            list(filter(lambda f: os.path.isfile(f), [
+                data_set_dir + f for f in gf.ListDirectory(data_set_dir)])),
             num_epochs=epoch_num)
 
         _, serialized_example = tf.TFRecordReader().read(filename_queue)
@@ -91,8 +97,9 @@ if __name__ == '__main__':
 
     ch_dict, _ = label_dict()
 
-    def test_queue():
-        filename_queue = tf.train.string_input_producer([get_path('record/test/test_set_0.tfr')])
+    def try_queue():
+
+        filename_queue = tf.train.string_input_producer([RECORD_ROOT + '/record/test/test_set_0.tfr'])
         _, serialized_example = tf.TFRecordReader().read(filename_queue)
         features = tf.parse_single_example(
             serialized_example,
@@ -113,8 +120,8 @@ if __name__ == '__main__':
             coord.request_stop()
             coord.join(threads)
 
-    def test_rand_queue():
-        image_batch, label_batch = data_queue(data_set=DS_TEST, batch_size=100, epoch_num=1)
+    def try_rand_queue():
+        image_batch, label_batch = data_queue(data_set=DS_TRAIN, batch_size=100, epoch_num=1)
         init_op = tf.group(tf.initialize_all_variables(),
                            tf.initialize_local_variables())
         with tf.Session() as sess:
@@ -138,5 +145,4 @@ if __name__ == '__main__':
             coord.join(threads)
 
 
-    test_rand_queue()
-
+    try_rand_queue()
