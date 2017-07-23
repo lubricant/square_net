@@ -12,12 +12,15 @@ data
 |   |----test： [CASIA 测试集文件 (.gnt)]
 |----mnist：    [MNIST 所有文件] 
 
-RECORD_ROOT     [任意一个磁盘目录]
-|----record:    [留空]
+RECORD_ROOT     [任意一个磁盘目录，在 __init__ 中定义]
+|----record:    
 |   |----train：[TFRecord 格式训练集文件 (.tfr)]
 |   |----test： [TFRecord 格式测试集文件 (.tfr)]
 |   |----all：  [TFRecord 格式数据集文件 (.tfr)]
-|----tmp:       [留空]
+
+TEMP_ROOT       [任意一个磁盘目录，在 __init__ 中定义]
+|----summary    [存放训练过程中生成的 Summary] 
+|----checkpoint [存放训练过程中生成的 Checkpoint]
 '''
 
 
@@ -120,7 +123,7 @@ def prepare_image_files(file_name, data_set, img_per_file=250000, dict_path='lab
                 flush_image(ch, img, file_dir)
                 ch_num += 1
                 if img_transfer:
-                    img_out = np.zeros(img.shape)
+                    img_out = np.zeros(img.shape, dtype=np.uint8)
                     ch_num += len(img_transfer)
                     for trans in img_transfer:
                         t_img = trans(img, img_out)

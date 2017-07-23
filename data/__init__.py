@@ -9,44 +9,16 @@ from tensorflow.python import gfile as gf
 import data as this
 
 PWD = os.path.abspath(os.path.join(inspect.getfile(this), os.pardir)).replace('\\', '/')
-RECORD_ROOT = 'H:/data_set'
+RECORD_ROOT = 'F:'
+TEMP_ROOT = PWD
 
 NUM_CLASSES = 10 + 3755
 IMG_SIZE, IMG_CHANNEL = 112, 1
 (DS_TRAIN, DS_TEST, DS_ALL) = ('TRAIN', 'TEST', 'ALL')
 
 
-# def get_path(path):
-#     path = path.replace('/', os.path.sep)
-#     if not path.startswith(os.path.sep):
-#         path = os.path.sep + path
-#     return PWD + path
-#
-#
-# def get_size(path):
-#     filename = get_path(path)
-#     assert os.path.isfile(filename)
-#     return os.path.getsize(filename)
-#
-#
-# def list_file(path):
-#     filename = get_path(path)
-#     assert os.path.isdir(filename)
-#     return os.listdir(filename)
-#
-#
-# def exist_path(path):
-#     return os.path.exists(get_path(path))
-#
-#
-# def ensure_path(path):
-#     if exist_path(path):
-#         shutil.rmtree(get_path(path))
-#     os.mkdir(get_path(path))
-
-
 def label_dict(dict_path='labels_dict.npy'):
-
+    assert gf.Exists(PWD + '/' + dict_path)
     return np.load(PWD + '/' + dict_path)
 
 
@@ -55,7 +27,7 @@ def data_queue(data_set, batch_size, thread_num=1, epoch_num=None):
     assert batch_size > 0 and thread_num > 0
 
     data_repo = {
-        DS_TRAIN: ['F:/record/train/', 'G:/record/train/'],
+        DS_TRAIN: ['F:/record/train/'],
         DS_TEST: [],
         DS_ALL: []}
 
@@ -104,7 +76,7 @@ if __name__ == '__main__':
 
     def try_queue():
 
-        filename_queue = tf.train.string_input_producer([RECORD_ROOT + '/record/test/test_set_0.tfr'])
+        filename_queue = tf.train.string_input_producer([RECORD_ROOT + '/record/train/training_set_0.tfr'])
         _, serialized_example = tf.TFRecordReader().read(filename_queue)
         features = tf.parse_single_example(
             serialized_example,

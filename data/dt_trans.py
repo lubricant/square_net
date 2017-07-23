@@ -45,9 +45,10 @@ class DT(object):
         x_dt = [prepare(x, cols, horizon_dt) for x in range(0, cols)]
 
         if out is None:
-            image_dt = np.zeros(image.shape)
+            image_dt = np.zeros(image.shape, dtype=image.dtype)
         else:
             assert out.shape == image.shape
+            assert out.dtype == image.dtype
             image_dt = out
 
         for y in range(0, rows):
