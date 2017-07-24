@@ -28,12 +28,12 @@ flags.DEFINE_integer("log_interval", 2000, 'Number of step between each logging.
 flags.DEFINE_integer("checkpoint_interval", 20000, 'Number of step between each checkpoint.')
 
 flags.DEFINE_string('log_dir', data.TEMP_ROOT + '/tmp/summary', 'Summaries directory.')
-flags.DEFINE_string('checkpoint_dir', data.TEMP_ROOT + 'tmp/checkpoint', 'Checkpoint directory.')
-flags.DEFINE_string('checkpoint_file', data.TEMP_ROOT + 'tmp/checkpoint/status', 'Checkpoint file prefix.')
-flags.DEFINE_string('trace_file', data.TEMP_ROOT + 'tmp/trace.ctf.json', 'Chrome timeline format file.')
+flags.DEFINE_string('checkpoint_dir', data.TEMP_ROOT + '/tmp/checkpoint', 'Checkpoint directory.')
+flags.DEFINE_string('checkpoint_file', data.TEMP_ROOT + '/tmp/checkpoint/status', 'Checkpoint file prefix.')
+flags.DEFINE_string('trace_file', data.TEMP_ROOT + '/tmp/trace.ctf.json', 'Chrome timeline format file.')
 
 if tf.app.flags.FLAGS.is_training:
-    flags.DEFINE_integer('epoch_num', 3, 'Number of epochs to run trainer.')
+    flags.DEFINE_integer('epoch_num', 1, 'Number of epochs to run trainer.')
     flags.DEFINE_integer("thread_num", 5, 'Number of thread to read data.')
     flags.DEFINE_string('data_set', data.DS_TRAIN, 'Application execute mode.')
 else:
