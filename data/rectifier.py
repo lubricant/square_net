@@ -123,10 +123,9 @@ def prepare_image_files(file_name, data_set, img_per_file=250000, dict_path='lab
                 flush_image(ch, img, file_dir)
                 ch_num += 1
                 if img_transfer:
-                    img_out = np.zeros(img.shape, dtype=np.uint8)
                     ch_num += len(img_transfer)
                     for trans in img_transfer:
-                        t_img = trans(img, img_out)
+                        t_img = trans(img)
                         assert t_img.shape == img.shape
                         flush_image(ch, t_img, file_dir)
 
@@ -151,9 +150,9 @@ def prepare_image_files(file_name, data_set, img_per_file=250000, dict_path='lab
 
     trans_33, trans_19, trans_15 = Deform(3.3), Deform(1.95), Deform(1.6)
 
-    transfer_list = ([lambda im, out, f=flag: trans_33.transform(im, f, out) for flag in factor_33] +
-                     [lambda im, out, f=flag: trans_19.transform(im, f, out) for flag in factor_19] +
-                     [lambda im, out, f=flag: trans_15.transform(im, f, out) for flag in factor_15])
+    transfer_list = ([lambda im, f=flag: trans_33.transform(im, f) for flag in factor_33] +
+                     [lambda im, f=flag: trans_19.transform(im, f) for flag in factor_19] +
+                     [lambda im, f=flag: trans_15.transform(im, f) for flag in factor_15])
 
     extra_img_num = len(transfer_list)
 
@@ -185,7 +184,6 @@ def prepare_image_files(file_name, data_set, img_per_file=250000, dict_path='lab
                           img_transfer=transfer_list)
 
     logging.info('Finish preparing image file')
-
 
 if __name__ == '__main__':
     import sys
