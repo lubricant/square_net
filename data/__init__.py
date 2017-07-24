@@ -17,9 +17,9 @@ IMG_SIZE, IMG_CHANNEL = 112, 1
 (DS_TRAIN, DS_TEST, DS_ALL) = ('TRAIN', 'TEST', 'ALL')
 
 
-def label_dict(dict_path='labels_dict.npy'):
-    assert gf.Exists(PWD + '/' + dict_path)
-    return np.load(PWD + '/' + dict_path)
+def label_dict(dict_name='labels_dict.npy'):
+    assert gf.Exists(PWD + '/blob/' + dict_name)
+    return np.load(PWD + '/blob/' + dict_name)
 
 
 def data_queue(data_set, batch_size, thread_num=1, epoch_num=None):
