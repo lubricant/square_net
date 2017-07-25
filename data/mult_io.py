@@ -1,31 +1,51 @@
-import time
+import logging
 from threading import *
-from queue import Queue
+from queue import *
 
 
 class MIO(Thread):
 
-    def __init__(self, data_queue, **args):
+    def __init__(self, data_queue, ctx_mgr=None, **args):
         super().__init__(**args)
         assert isinstance(data_queue, Queue)
+        assert ctx_mgr is None or MIO.as_ctx_mgr(ctx_mgr)
         self.data_queue = data_queue
+        self.ctx_mgr = ctx_mgr
+
+    def execute(self):
+        raise NotImplementedError
+
+    def run(self):
+        if not self.ctx_mgr:
+            self.execute()
+        else:
+            with self.ctx_mgr:
+                self.execute()
+
+    @staticmethod
+    def as_ctx_mgr(obj):
+        if hasattr(obj, '__enter__') and hasattr(obj, '__exit__'):
+            return obj
 
 
 class Producer(MIO):
 
-    def __init__(self, data_queue, **args):
-        super().__init__(data_queue, **args)
+    def __init__(self, data_source, data_queue, **args):
+        super().__init__(data_queue, MIO.as_ctx_mgr(data_source), **args)
+        assert data_source is not None and (
+            hasattr(data_source, '__iter__'))
+        self.data_src = data_source
         self.end_sign = Event()
 
     def produce(self):
-        raise NotImplementedError
+        try:
+            return next(self.data_src)
+        except StopIteration:
+            return None
 
-    def run(self):
+    def execute(self):
         while True:
-            try:
-                item = self.produce()
-            except StopIteration:
-                break
+            item = self.produce()
             if item is None:
                 break
             self.data_queue.put(item)
@@ -34,76 +54,41 @@ class Producer(MIO):
 
 class Consumer(MIO):
 
-    def __init__(self, end_events, data_queue, **args):
-        super().__init__(data_queue,  **args)
-        assert isinstance(end_events, (list, tuple)) and \
-               all(isinstance(e, Event) for e in end_events)
-        self.end_events = end_events
+    def __init__(self, workers, data_sink, data_queue, **args):
+        super().__init__(data_queue, MIO.as_ctx_mgr(data_sink), **args)
+        assert isinstance(workers, (list, tuple)) and (
+               all(isinstance(x, Producer) for x in workers))
+        assert data_sink is not None and (
+            hasattr(data_sink, '__call__'))
+        self.data_sink = data_sink
+        self.end_events = [x.end_sign for x in workers]
 
     def consume(self, item):
-        raise NotImplementedError
+        self.data_sink(item)
 
-    def run(self):
-        while not all(e.is_set() for e in self.end_events):
-            item = self.data_queue.get(timeout=1)
+    def execute(self):
+        while True:
+            try:
+                item = self.data_queue.get(timeout=1)
+            except Empty:
+                item = None
+
             if item is not None:
                 self.consume(item)
-
-
-class MnistProducer(Producer):
-
-    def __init__(self, fetch_num, file_list, data_queue, **args):
-        super().__init__(data_queue, **args)
-
-        self.digits_cnt = {}
-        for i in range(10):
-            self.digits_cnt[str(i)] = 0
-
-        self.file_list = file_list
-
-    def produce(self):
-        pass
-        # for file in self.file_list:
-        #     for digit, img in file:
-        #
-        #         if not len(digits_cnt.keys()):
-        #             logging.info('Enough MNIST image')
-        #             return
-        #
-        #         if digit not in digits_cnt:
-        #             continue
-        #
-        #         if digits_cnt[digit] == fetch_num:
-        #             logging.info('fetched enough digit {}'.format(digit))
-        #             del digits_cnt[digit]
-        #             continue
-        #
-        #         digits_cnt[digit] += 1
-        #         flush_image(digit, img, file_dir)
-        #
-        # logging.error('Not enough MNIST image: {}'.format(['%d:%d' % (
-        #     d, fetch_num-digits_cnt[d] if d in digits_cnt else fetch_num) for d in range(10)]))
-
+            else:
+                if all(e.is_set() for e in self.end_events):
+                    break
 
 if __name__ == '__main__':
 
     queue = Queue(maxsize=2)
 
-    class P(Producer):
-        cnt = 3
+    def xrange(a, b):
+        for i in range(a, b):
+            yield i
 
-        def produce(self):
-            if self.cnt == 0:
-                return None
-            self.cnt -= 1
-            return self.cnt
-
-    class C(Consumer):
-        def consume(self, item):
-            print(item)
-
-    p1, p2 = P(queue), P(queue)
-    c = C([p1.end_sign, p2.end_sign], queue)
+    p1, p2 = Producer(xrange(1, 6), queue), Producer(xrange(6, 11), queue)
+    c = Consumer([p1, p2], lambda x: print(x), queue)
 
     p1.start()
     p2.start()
