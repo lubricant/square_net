@@ -109,12 +109,12 @@ class TFRecordFile(File):
         super().__init__(filename)
         assert gf.Exists(RECORD_ROOT + '/record/')
         self.__dict_map = dict_map
-        self.__filepath = RECORD_ROOT + '/record/' + filename
-        self.__tfwriter = None
+        self.__file_path = RECORD_ROOT + '/record/' + filename
+        self.__tf_writer = None
 
     def __iter__(self):
-        assert gf.Exists(self.__filepath)
-        for serialized_example in tf.python_io.tf_record_iterator(self.__filepath):
+        assert gf.Exists(self.__file_path)
+        for serialized_example in tf.python_io.tf_record_iterator(self.__file_path):
             example = tf.train.Example()
             example.ParseFromString(serialized_example)
 
@@ -131,11 +131,11 @@ class TFRecordFile(File):
         assert dict_map and (ch in dict_map) and (
             isinstance(dict_map[ch], int))
 
-        if not self.__tfwriter:
+        if not self.__tf_writer:
             assert gf.Exists(RECORD_ROOT + '/record/')
-            self.__tfwriter = tf.python_io.TFRecordWriter(self.__filepath)
+            self.__tf_writer = tf.python_io.TFRecordWriter(self.__file_path)
 
-        writer = self.__tfwriter
+        writer = self.__tf_writer
         example = tf.train.Example(features=tf.train.Features(feature={
             'label': tf.train.Feature(bytes_list=tf.train.BytesList(value=[ch.encode()])),
             'index': tf.train.Feature(int64_list=tf.train.Int64List(value=[dict_map[ch]])),
@@ -146,9 +146,9 @@ class TFRecordFile(File):
         writer.write(example.SerializeToString())
 
     def close(self):
-        if self.__tfwriter:
-            self.__tfwriter.close()
-            self.__tfwriter = None
+        if self.__tf_writer:
+            self.__tf_writer.close()
+            self.__tf_writer = None
 
 
 if __name__ == '__main__':

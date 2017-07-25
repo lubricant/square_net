@@ -35,11 +35,12 @@ class Producer(MIO):
         assert data_source is not None and (
             hasattr(data_source, '__iter__'))
         self.data_src = data_source
+        self.data_iter = iter(data_source)
         self.end_sign = Event()
 
     def produce(self):
         try:
-            return next(self.data_src)
+            return next(self.data_iter)
         except StopIteration:
             return None
 
