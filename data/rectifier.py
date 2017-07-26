@@ -1,6 +1,7 @@
-
+import queue
 import logging
 
+from data.mult_io import *
 from data.dt_trans import *
 from data.fmt_file import *
 
@@ -10,16 +11,16 @@ data
 |----casia
 |   |----train：[CASIA 训练集文件 (.gnt)]
 |   |----test： [CASIA 测试集文件 (.gnt)]
-|----mnist：    [MNIST 所有文件] 
+|----mnist：    [MNIST 所有文件]
 
 RECORD_ROOT     [任意一个磁盘目录，在 __init__ 中定义]
-|----record:    
+|----record:
 |   |----train：[TFRecord 格式训练集文件 (.tfr)]
 |   |----test： [TFRecord 格式测试集文件 (.tfr)]
 |   |----all：  [TFRecord 格式数据集文件 (.tfr)]
 
 TEMP_ROOT       [任意一个磁盘目录，在 __init__ 中定义]
-|----summary    [存放训练过程中生成的 Summary] 
+|----summary    [存放训练过程中生成的 Summary]
 |----checkpoint [存放训练过程中生成的 Checkpoint]
 '''
 
@@ -58,81 +59,184 @@ def prepare_label_dict(dict_path='tmp/labels_dict.npy'):
     logging.info('Finish preparing label dict.')
 
 
-def prepare_image_files(file_name, data_set, img_per_file=250000, dict_path='labels_dict.npy', img_filter=lambda _: _):
+def prepare_image_files(file_name, data_set, img_per_file=250000, dict_path=None, img_filter=lambda _: _):
     '''
     将原始图片文件转换为 TFRecord 格式的文件
     '''
 
-    logging.info('Start preparing image file ......')
+    class TFWriter(object):
 
-    _, id_mapping = np.load(dict_path)
+        def __init__(self, file_dir, img_queue):
+            self.file_dir = file_dir
+            self.img_queue = img_queue
+            self.img_num, self.img_writer = 0, []
+            _, self.forward_dict = np.load((PWD + '/blob/labels_dict.npy') if not dict_path else dict_path)
 
-    img_cnt, img_writer, digits_cnt = [0], [], {}
+        def __enter__(self):
+            pass
 
-    for i in range(10):
-        digits_cnt[str(i)] = 0
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            if len(self.img_writer):
+                self.img_writer[-1].close()
+                self.img_writer = None
+            del self.forward_dict
+            self.forward_dict = None
+            logging.info('Total image : %d', self.img_num)
 
-    def flush_image(ch_str, img_arr, file_dir):
+        def __call__(self, data_batch):
+            img_writer = self.img_writer
+            writer_id = self.img_num // img_per_file
+            if not self.img_num % img_per_file:
+                if writer_id:
+                    img_writer[writer_id - 1].close()
+                img_writer.append(TFRecordFile((self.file_dir + '/' + file_name) % writer_id, self.forward_dict))
+                assert writer_id == len(img_writer) - 1
 
-        writer_id = img_cnt[0] // img_per_file
-        if not img_cnt[0] % img_per_file:
-            if writer_id:
-                img_writer[writer_id-1].close()
-            img_writer.append(TFRecordFile((file_dir + '/' + file_name) % writer_id, id_mapping))
-            assert writer_id == len(img_writer) - 1
+            for ch, im in data_batch:
+                img_writer[writer_id].write(ch, img_filter(im))
+            self.img_num += len(data_batch)
+            # print(self.img_queue.qsize())
 
-        img_writer[writer_id].write(ch_str, img_filter(img_arr))
-        img_cnt[0] += 1
+    class MNISTReader(object):
 
-    def flush_mnist_image(file_list, file_dir, fetch_num):
+        def __init__(self, file_list, fetch_num):
+            assert len(file_list)
+            self.file_list = file_list
+            self.fetch_num = fetch_num
+            self.digits_cnt = {}
+            for n in range(10):
+                self.digits_cnt[str(n)] = 0
 
-        logging.info('Expect MNIST image: {}[{}x{}]'.format(fetch_num*10, 10,  fetch_num))
+        def __enter__(self):
+            logging.info('Expect MNIST image: {}[{}x{}]'.format(
+                self.fetch_num * 10, 10, self.fetch_num))
 
-        for file in file_list:
-            for digit, img in file:
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            if len(self.digits_cnt):
+                logging.error('Not enough MNIST image: {}'.format(['%d:%d' % (
+                    n, self.fetch_num - self.digits_cnt[n] if n in self.digits_cnt else self.fetch_num
+                ) for n in range(10)]))
 
-                if not len(digits_cnt.keys()):
-                    logging.info('Enough MNIST image')
-                    return
+        def __iter__(self):
+            digits_cnt = self.digits_cnt
+            for file in self.file_list:
+                for digit, img in file:
 
-                if digit not in digits_cnt:
-                    continue
+                    if not len(digits_cnt):
+                        logging.info('Enough MNIST image')
+                        return
 
-                if digits_cnt[digit] == fetch_num:
-                    logging.info('fetched enough digit {}'.format(digit))
-                    del digits_cnt[digit]
-                    continue
+                    if digit not in digits_cnt:
+                        continue
 
-                digits_cnt[digit] += 1
-                flush_image(digit, img, file_dir)
+                    if digits_cnt[digit] == self.fetch_num:
+                        logging.info('fetched enough digit {}'.format(digit))
+                        del digits_cnt[digit]
+                        continue
 
-        logging.error('Not enough MNIST image: {}'.format(['%d:%d' % (
-            d, fetch_num-digits_cnt[d] if d in digits_cnt else fetch_num) for d in range(10)]))
+                    digits_cnt[digit] += 1
+                    yield [(digit, img)]
 
-    def flush_casia_image(file_list, file_dir, img_transfer=None):
+    class CASIAReader(object):
 
-        file_num = len(file_list)
-        extra_num = 1 if not img_transfer else len(img_transfer)
-        logging.info('Expect CASIA image: {}[{}x{}x{}]'.format(
-            3755*file_num*extra_num, 3755, file_num, extra_num))
+        def __init__(self, file_list, img_transfer=None):
+            assert len(file_list)
+            self.file_list = file_list
+            self.img_transfer = img_transfer
+            self.total_img_num = 0
 
-        total_ch_num = 0
-        for file in file_list:
-            ch_num = 0
-            for ch, img in file:
-                flush_image(ch, img, file_dir)
-                ch_num += 1
-                if img_transfer:
-                    ch_num += len(img_transfer)
-                    for trans in img_transfer:
-                        t_img = trans(img)
-                        assert t_img.shape == img.shape
-                        flush_image(ch, t_img, file_dir)
+        def __enter__(self):
+            file_num = len(self.file_list)
+            extra_num = 1 if not self.img_transfer else len(self.img_transfer)
+            logging.info('Expect CASIA image: {}[{}x{}x{}]'.format(
+                3755 * file_num * extra_num, 3755, file_num, extra_num))
 
-            total_ch_num += ch_num
-            logging.info('got {} from file {}'.format(ch_num, file.name))
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            pass
 
-        logging.info('Total CASIA image: {}'.format(total_ch_num))
+        def __iter__(self):
+
+            img_transfer = self.img_transfer
+            for file in self.file_list:
+                img_num = 0
+                for ch, img in file:
+                    batch = [(ch, img)]
+                    if img_transfer:
+                        batch += [(ch, trans(img)) for trans in img_transfer]
+                    yield batch
+                    img_num += len(batch)
+
+                self.total_img_num += img_num
+                logging.info('got {} from file {}'.format(img_num, file.name))
+
+    # _, id_mapping = np.load(dict_path)
+    #
+    # img_cnt, img_writer, digits_cnt = [0], [], {}
+    #
+    # for i in range(10):
+    #     digits_cnt[str(i)] = 0
+    #
+    # def flush_image(ch_str, img_arr, file_dir):
+    #
+    #     writer_id = img_cnt[0] // img_per_file
+    #     if not img_cnt[0] % img_per_file:
+    #         if writer_id:
+    #             img_writer[writer_id-1].close()
+    #         img_writer.append(TFRecordFile((file_dir + '/' + file_name) % writer_id, id_mapping))
+    #         assert writer_id == len(img_writer) - 1
+    #
+    #     img_writer[writer_id].write(ch_str, img_filter(img_arr))
+    #     img_cnt[0] += 1
+    #
+    # def flush_mnist_image(file_list, file_dir, fetch_num):
+    #
+    #     logging.info('Expect MNIST image: {}[{}x{}]'.format(fetch_num*10, 10,  fetch_num))
+    #
+    #     for file in file_list:
+    #         for digit, img in file:
+    #
+    #             if not len(digits_cnt.keys()):
+    #                 logging.info('Enough MNIST image')
+    #                 return
+    #
+    #             if digit not in digits_cnt:
+    #                 continue
+    #
+    #             if digits_cnt[digit] == fetch_num:
+    #                 logging.info('fetched enough digit {}'.format(digit))
+    #                 del digits_cnt[digit]
+    #                 continue
+    #
+    #             digits_cnt[digit] += 1
+    #             flush_image(digit, img, file_dir)
+    #
+    #     logging.error('Not enough MNIST image: {}'.format(['%d:%d' % (
+    #         d, fetch_num-digits_cnt[d] if d in digits_cnt else fetch_num) for d in range(10)]))
+    #
+    # def flush_casia_image(file_list, file_dir, img_transfer=None):
+    #
+    #     file_num = len(file_list)
+    #     extra_num = 1 if not img_transfer else len(img_transfer)
+    #     logging.info('Expect CASIA image: {}[{}x{}x{}]'.format(
+    #         3755*file_num*extra_num, 3755, file_num, extra_num))
+    #
+    #     total_ch_num = 0
+    #     for file in file_list:
+    #         ch_num = 0
+    #         for ch, img in file:
+    #             flush_image(ch, img, file_dir)
+    #             ch_num += 1
+    #             if img_transfer:
+    #                 ch_num += len(img_transfer)
+    #                 for trans in img_transfer:
+    #                     t_img = trans(img)
+    #                     assert t_img.shape == img.shape
+    #                     flush_image(ch, t_img, file_dir)
+    #
+    #         total_ch_num += ch_num
+    #         logging.info('got {} from file {}'.format(ch_num, file.name))
+    #
+    #     logging.info('Total CASIA image: {}'.format(total_ch_num))
 
     assert data_set.upper() in ('TRAINING', 'TEST', 'ALL')
 
@@ -154,7 +258,35 @@ def prepare_image_files(file_name, data_set, img_per_file=250000, dict_path='lab
                      [lambda im, f=flag: trans_19.transform(im, f) for flag in factor_19] +
                      [lambda im, f=flag: trans_15.transform(im, f) for flag in factor_15])
 
-    extra_img_num = len(transfer_list)
+    def start_reader(mist_files, casi_files, dir_prefix,
+                     casi_img_transfer=None, casi_reader_num=3, queue_writer_num=3):
+
+        logging.info('Start preparing image file ......')
+
+        n = max(1, len(casi_files) // casi_reader_num)
+        casi_files_batch = [casi_files[i: min(i+n, len(casi_files))] for i in range(0, len(casi_files), n)]
+
+        casi_file_num, casi_boost_num = len(casi_files), len(casi_img_transfer) if casi_img_transfer else 0
+
+        img_queue = queue.Queue(maxsize=100)
+        mist_reader = [Producer(MNISTReader(mist_files, casi_file_num * (1 + casi_boost_num)), img_queue)]
+        casi_reader = [Producer(CASIAReader(batch, transfer_list), img_queue) for batch in casi_files_batch]
+
+        tf_writer_seq = [dir_prefix] if queue_writer_num < 2 else (
+                        [dir_prefix + '_' + str(i) for i in range(queue_writer_num)])
+        tf_writer = [Consumer(mist_reader + casi_reader, TFWriter(dir_with_seq, img_queue), img_queue)
+                     for dir_with_seq in tf_writer_seq]
+
+        [ensure_dir('/record/' + dir_with_seq) for dir_with_seq in tf_writer_seq]
+
+        [reader.start() for reader in (mist_reader + casi_reader)]
+        [writer.start() for writer in tf_writer]
+        [writer.join() for writer in tf_writer]
+
+        total_casi_num = sum([reader.data_src.total_img_num for reader in casi_reader])
+        logging.info('Total CASIA image: {}'.format(total_casi_num))
+
+        logging.info('Finish preparing image file')
 
     def ensure_dir(dirname):
         if gf.Exists(RECORD_ROOT + dirname):
@@ -162,28 +294,26 @@ def prepare_image_files(file_name, data_set, img_per_file=250000, dict_path='lab
         gf.MakeDirs(RECORD_ROOT + dirname)
 
     if data_set.upper() == 'TRAINING':
-        ensure_dir('/record/train')
-        flush_mnist_image([MnistFile('train-images.idx3-ubyte', 'train-labels.idx1-ubyte')], 'train',
-                          fetch_num=240 * (1 + extra_img_num))
-        flush_casia_image([CasiaFile('train/' + name) for name in gf.ListDirectory(PWD + '/casia/train')], 'train',
-                          img_transfer=transfer_list)
+        mist_file_list = [MnistFile('train-images.idx3-ubyte', 'train-labels.idx1-ubyte')]
+        casi_file_list = [CasiaFile('train/' + name) for name in gf.ListDirectory(PWD + '/casia/train') if
+                          not gf.IsDirectory(PWD + '/casia/train/' + name)]
+        start_reader(mist_file_list, casi_file_list, 'train', transfer_list)
 
     if data_set.upper() == 'TEST':
-        ensure_dir('/record/test')
-        flush_mnist_image([MnistFile('t10k-images.idx3-ubyte', 't10k-labels.idx1-ubyte')], 'test', fetch_num=60)
-        flush_casia_image([CasiaFile('test/' + name) for name in gf.ListDirectory(PWD + '/casia/test')], 'test',)
+        mist_file_list = [MnistFile('t10k-images.idx3-ubyte', 't10k-labels.idx1-ubyte')]
+        casi_file_list = [CasiaFile('test/' + name) for name in gf.ListDirectory(PWD + '/casia/test') if
+                          not gf.IsDirectory(PWD + '/casia/test/' + name)]
+        start_reader(mist_file_list, casi_file_list, 'test')
 
     if data_set.upper() == 'ALL':
-        ensure_dir('/record/all')
-        flush_mnist_image([MnistFile('train-images.idx3-ubyte', 'train-labels.idx1-ubyte')], 'all',
-                          fetch_num=240 * (1 + extra_img_num))
-        flush_mnist_image([MnistFile('t10k-images.idx3-ubyte', 't10k-labels.idx1-ubyte')], 'all',
-                          fetch_num=60 * (1 + extra_img_num))
-        flush_casia_image([CasiaFile('train/' + name) for name in gf.ListDirectory(PWD + '/casia/train')] +
-                          [CasiaFile('test/' + name) for name in gf.ListDirectory(PWD + '/casia/test')], 'all',
-                          img_transfer=transfer_list)
+        mist_file_list = [MnistFile('train-images.idx3-ubyte', 'train-labels.idx1-ubyte'),
+                          MnistFile('t10k-images.idx3-ubyte', 't10k-labels.idx1-ubyte')]
+        casi_file_list = ([CasiaFile('train/' + name) for name in gf.ListDirectory(PWD + '/casia/train') if
+                           not gf.IsDirectory(PWD + '/casia/train/' + name)] +
+                          [CasiaFile('test/' + name) for name in gf.ListDirectory(PWD + '/casia/test') if
+                           not gf.IsDirectory(PWD + '/casia/test/' + name)])
+        start_reader(mist_file_list, casi_file_list, 'all', transfer_list)
 
-    logging.info('Finish preparing image file')
 
 if __name__ == '__main__':
     import sys
