@@ -30,8 +30,11 @@ class MIO(Thread):
 
 class Producer(MIO):
 
-    def __init__(self, data_source, data_queue, **args):
-        super().__init__(data_queue, MIO.as_ctx_mgr(data_source), **args)
+    __id = 0
+
+    def __init__(self, data_source, data_queue):
+        Producer.__id += 1
+        super().__init__(data_queue, MIO.as_ctx_mgr(data_source), name='Producer-%s' % Producer. __id)
         assert data_source is not None and (
             hasattr(data_source, '__iter__'))
         self.data_src = data_source
@@ -55,8 +58,11 @@ class Producer(MIO):
 
 class Consumer(MIO):
 
-    def __init__(self, workers, data_sink, data_queue, **args):
-        super().__init__(data_queue, MIO.as_ctx_mgr(data_sink), **args)
+    __id = 0
+
+    def __init__(self, workers, data_sink, data_queue):
+        Consumer.__id += 1
+        super().__init__(data_queue, MIO.as_ctx_mgr(data_sink), name='Consumer-%s' % Consumer.__id)
         assert isinstance(workers, (list, tuple)) and (
                all(isinstance(x, Producer) for x in workers))
         assert data_sink is not None and (

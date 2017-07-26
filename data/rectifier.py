@@ -86,7 +86,7 @@ def prepare_image_files(file_name, data_set, img_per_file=250000, dict_path=None
         def __call__(self, data_batch):
             img_writer = self.img_writer
             writer_id = self.img_num // img_per_file
-            if not self.img_num % img_per_file:
+            if writer_id >= len(img_writer):
                 if writer_id:
                     img_writer[writer_id - 1].close()
                 img_writer.append(TFRecordFile((self.file_dir + '/' + file_name) % writer_id, self.forward_dict))
@@ -318,7 +318,7 @@ def prepare_image_files(file_name, data_set, img_per_file=250000, dict_path=None
 if __name__ == '__main__':
     import sys
     logging.basicConfig(level=logging.DEBUG,
-                        format='[%(asctime)s] %(message)s',
+                        format='[%(asctime)s][%(threadName)s] %(message)s',
                         datefmt='%Y-%m-%d %H:%M:%S',
                         stream=sys.stdout)
 
