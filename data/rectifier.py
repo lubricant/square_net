@@ -252,7 +252,7 @@ def prepare_image_files(file_name, data_set, img_per_file=250000, dict_path=None
         mist_file_list = [MnistFile('t10k-images.idx3-ubyte', 't10k-labels.idx1-ubyte')]
         casi_file_list = [CasiaFile('test/' + name) for name in gf.ListDirectory(PWD + '/casia/test') if
                           not gf.IsDirectory(PWD + '/casia/test/' + name)]
-        start_reader(mist_file_list, casi_file_list, 'test')
+        start_reader(mist_file_list, casi_file_list, 'test', queue_writer_num=1)
 
     if data_set.upper() == 'ALL':
         mist_file_list = [MnistFile('train-images.idx3-ubyte', 'train-labels.idx1-ubyte'),

@@ -9,8 +9,8 @@ from tensorflow.python import gfile as gf
 import data as this
 
 PWD = os.path.abspath(os.path.join(inspect.getfile(this), os.pardir)).replace('\\', '/')
-RECORD_ROOT = 'G:'
-TEMP_ROOT = PWD
+RECORD_ROOT = 'F:'
+TEMP_ROOT = 'G:'
 
 NUM_CLASSES = 10 + 3755
 IMG_SIZE, IMG_CHANNEL = 112, 1
@@ -27,7 +27,7 @@ def data_queue(data_set, batch_size, thread_num=1, epoch_num=None):
     assert batch_size > 0 and thread_num > 0
 
     data_repo = {
-        DS_TRAIN: ['/record/train/'],
+        DS_TRAIN: ['/record_is_ready/train_0/', '/record_is_ready/train_1/', '/record_is_ready/train_2/'],
         DS_TEST: ['/record/test/'],
         DS_ALL: []}
 
