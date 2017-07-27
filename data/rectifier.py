@@ -99,43 +99,53 @@ def prepare_image_files(file_name, data_set, img_per_file=250000, dict_path=None
 
     class MNISTReader(object):
 
-        def __init__(self, file_list, fetch_num):
+        def __init__(self, file_list, fetch_num=None):
             assert len(file_list)
             self.file_list = file_list
             self.fetch_num = fetch_num
+            self.total_num = 0
             self.digits_cnt = {}
             for n in range(10):
                 self.digits_cnt[str(n)] = 0
 
         def __enter__(self):
-            logging.info('Expect MNIST image: {}[{}x{}]'.format(
-                self.fetch_num * 10, 10, self.fetch_num))
+            if self.fetch_num is not None:
+                logging.info('Expect MNIST image: {}[{}x{}]'.format(
+                    self.fetch_num * 10, 10, self.fetch_num))
 
         def __exit__(self, exc_type, exc_val, exc_tb):
-            if len(self.digits_cnt):
+            if len(self.digits_cnt) and self.fetch_num is not None:
                 logging.error('Not enough MNIST image: {}'.format(['%d:%d' % (
                     n, self.fetch_num - self.digits_cnt[n] if n in self.digits_cnt else self.fetch_num
                 ) for n in range(10)]))
+            else:
+                logging.info('Total MNIST image: {}'.format(self.total_num))
 
         def __iter__(self):
-            digits_cnt = self.digits_cnt
-            for file in self.file_list:
-                for digit, img in file:
+            digits_cnt, fetch_num = self.digits_cnt, self.fetch_num
+            if fetch_num is None:
+                for file in self.file_list:
+                    for digit, img in file:
+                        self.total_num += 1
+                        yield [(digit, img)]
+            else:
+                for file in self.file_list:
+                    for digit, img in file:
 
-                    if not len(digits_cnt):
-                        logging.info('Enough MNIST image')
-                        return
+                        if not len(digits_cnt):
+                            logging.info('Enough MNIST image')
+                            return
 
-                    if digit not in digits_cnt:
-                        continue
+                        if digit not in digits_cnt:
+                            continue
 
-                    if digits_cnt[digit] == self.fetch_num:
-                        logging.info('fetched enough digit {}'.format(digit))
-                        del digits_cnt[digit]
-                        continue
+                        if digits_cnt[digit] == self.fetch_num:
+                            logging.info('fetched enough digit {}'.format(digit))
+                            del digits_cnt[digit]
+                            continue
 
-                    digits_cnt[digit] += 1
-                    yield [(digit, img)]
+                        digits_cnt[digit] += 1
+                        yield [(digit, img)]
 
     class CASIAReader(object):
 
@@ -169,75 +179,6 @@ def prepare_image_files(file_name, data_set, img_per_file=250000, dict_path=None
                 self.total_img_num += img_num
                 logging.info('got {} from file {}'.format(img_num, file.name))
 
-    # _, id_mapping = np.load(dict_path)
-    #
-    # img_cnt, img_writer, digits_cnt = [0], [], {}
-    #
-    # for i in range(10):
-    #     digits_cnt[str(i)] = 0
-    #
-    # def flush_image(ch_str, img_arr, file_dir):
-    #
-    #     writer_id = img_cnt[0] // img_per_file
-    #     if not img_cnt[0] % img_per_file:
-    #         if writer_id:
-    #             img_writer[writer_id-1].close()
-    #         img_writer.append(TFRecordFile((file_dir + '/' + file_name) % writer_id, id_mapping))
-    #         assert writer_id == len(img_writer) - 1
-    #
-    #     img_writer[writer_id].write(ch_str, img_filter(img_arr))
-    #     img_cnt[0] += 1
-    #
-    # def flush_mnist_image(file_list, file_dir, fetch_num):
-    #
-    #     logging.info('Expect MNIST image: {}[{}x{}]'.format(fetch_num*10, 10,  fetch_num))
-    #
-    #     for file in file_list:
-    #         for digit, img in file:
-    #
-    #             if not len(digits_cnt.keys()):
-    #                 logging.info('Enough MNIST image')
-    #                 return
-    #
-    #             if digit not in digits_cnt:
-    #                 continue
-    #
-    #             if digits_cnt[digit] == fetch_num:
-    #                 logging.info('fetched enough digit {}'.format(digit))
-    #                 del digits_cnt[digit]
-    #                 continue
-    #
-    #             digits_cnt[digit] += 1
-    #             flush_image(digit, img, file_dir)
-    #
-    #     logging.error('Not enough MNIST image: {}'.format(['%d:%d' % (
-    #         d, fetch_num-digits_cnt[d] if d in digits_cnt else fetch_num) for d in range(10)]))
-    #
-    # def flush_casia_image(file_list, file_dir, img_transfer=None):
-    #
-    #     file_num = len(file_list)
-    #     extra_num = 1 if not img_transfer else len(img_transfer)
-    #     logging.info('Expect CASIA image: {}[{}x{}x{}]'.format(
-    #         3755*file_num*extra_num, 3755, file_num, extra_num))
-    #
-    #     total_ch_num = 0
-    #     for file in file_list:
-    #         ch_num = 0
-    #         for ch, img in file:
-    #             flush_image(ch, img, file_dir)
-    #             ch_num += 1
-    #             if img_transfer:
-    #                 ch_num += len(img_transfer)
-    #                 for trans in img_transfer:
-    #                     t_img = trans(img)
-    #                     assert t_img.shape == img.shape
-    #                     flush_image(ch, t_img, file_dir)
-    #
-    #         total_ch_num += ch_num
-    #         logging.info('got {} from file {}'.format(ch_num, file.name))
-    #
-    #     logging.info('Total CASIA image: {}'.format(total_ch_num))
-
     assert data_set.upper() in ('TRAINING', 'TEST', 'ALL')
 
     factor_33 = [DT.DT_TOP, DT.DT_LEFT, DT.DT_TOP | DT.DT_LEFT]
@@ -259,17 +200,25 @@ def prepare_image_files(file_name, data_set, img_per_file=250000, dict_path=None
                      [lambda im, f=flag: trans_15.transform(im, f) for flag in factor_15])
 
     def start_reader(mist_files, casi_files, dir_prefix,
-                     casi_img_transfer=None, casi_reader_num=3, queue_writer_num=3):
+                     casi_img_transfer=None, casi_reader_num=3, queue_writer_num=3,
+                     need_all_mist=False):
 
         logging.info('Start preparing image file ......')
 
-        n = max(1, len(casi_files) // casi_reader_num)
-        casi_files_batch = [casi_files[i: min(i+n, len(casi_files))] for i in range(0, len(casi_files), n)]
+        assert casi_files or mist_files
 
-        casi_file_num, casi_boost_num = len(casi_files), len(casi_img_transfer) if casi_img_transfer else 0
+        if casi_files:
+            n = max(1, len(casi_files) // casi_reader_num)
+            casi_files_batch = [casi_files[i: min(i+n, len(casi_files))] for i in range(0, len(casi_files), n)]
+
+            casi_file_num, casi_boost_num = len(casi_files), len(casi_img_transfer) if casi_img_transfer else 0
+            mist_fetch_num = None if need_all_mist else casi_file_num * (1 + casi_boost_num)
+        else:
+            mist_fetch_num = None
+            casi_files_batch = []
 
         img_queue = queue.Queue(maxsize=100)
-        mist_reader = [Producer(MNISTReader(mist_files, casi_file_num * (1 + casi_boost_num)), img_queue)]
+        mist_reader = [Producer(MNISTReader(mist_files, mist_fetch_num), img_queue)]
         casi_reader = [Producer(CASIAReader(batch, transfer_list), img_queue) for batch in casi_files_batch]
 
         tf_writer_seq = [dir_prefix] if queue_writer_num < 2 else (
@@ -329,7 +278,7 @@ if __name__ == '__main__':
     resize = lambda x: filter.filter(x)
 
     # prepare_label_dict()
-    prepare_image_files('training_set_%d.tfr', data_set='TRAINING', img_filter=resize)
+    # prepare_image_files('training_set_%d.tfr', data_set='TRAINING', img_filter=resize)
     # prepare_image_files('test_set_%d.tfr', data_set='TEST', img_filter=resize)
     # prepare_image_files('mixing_set_%d.tfr', data_set='ALL', img_filter=resize)
 

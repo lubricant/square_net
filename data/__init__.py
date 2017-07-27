@@ -9,7 +9,7 @@ from tensorflow.python import gfile as gf
 import data as this
 
 PWD = os.path.abspath(os.path.join(inspect.getfile(this), os.pardir)).replace('\\', '/')
-RECORD_ROOT = 'F:'
+RECORD_ROOT = 'G:'
 TEMP_ROOT = PWD
 
 NUM_CLASSES = 10 + 3755
@@ -27,15 +27,15 @@ def data_queue(data_set, batch_size, thread_num=1, epoch_num=None):
     assert batch_size > 0 and thread_num > 0
 
     data_repo = {
-        DS_TRAIN: ['F:/record/train/'],
-        DS_TEST: [],
+        DS_TRAIN: ['/record/train/'],
+        DS_TEST: ['/record/test/'],
         DS_ALL: []}
 
     assert data_set and data_set.upper() in data_repo
 
     with tf.name_scope('Queue'):
         data_set_file = []
-        data_set_list = data_repo[data_set.upper()]
+        data_set_list = [RECORD_ROOT + x for x in data_repo[data_set.upper()]]
 
         assert data_set_list
         for data_set in data_set_list:

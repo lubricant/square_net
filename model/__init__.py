@@ -24,8 +24,8 @@ flags.DEFINE_integer('image_channel', data.IMG_CHANNEL, 'Channel of image.')
 flags.DEFINE_integer('batch_size', 500, 'Batch size of each step.')
 
 flags.DEFINE_integer('decay_interval', 1000, 'Number of step between each exponential decay.')
-flags.DEFINE_integer("log_interval", 2000, 'Number of step between each logging.')
-flags.DEFINE_integer("checkpoint_interval", 20000, 'Number of step between each checkpoint.')
+flags.DEFINE_integer("log_interval", 300, 'Number of step between each logging.')
+flags.DEFINE_integer("checkpoint_interval", 3000, 'Number of step between each checkpoint.')
 
 flags.DEFINE_string('log_dir', data.TEMP_ROOT + '/tmp/summary', 'Summaries directory.')
 flags.DEFINE_string('checkpoint_dir', data.TEMP_ROOT + '/tmp/checkpoint', 'Checkpoint directory.')
