@@ -15,6 +15,7 @@ TEMP_ROOT = 'G:'
 NUM_CLASSES = 10 + 3755
 IMG_SIZE, IMG_CHANNEL = 112, 1
 (DS_TRAIN, DS_TEST, DS_ALL) = ('TRAIN', 'TEST', 'ALL')
+(TRAIN_SET_PREFIX, TEST_SET_PREFIX) = ('training_set', 'test_set')
 
 
 def label_dict(dict_name='labels_dict.npy'):
