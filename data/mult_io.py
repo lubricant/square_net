@@ -183,14 +183,13 @@ class CASIAReader(object):
         assert len(file_list)
         self.file_list = [CasiaFile(f) for f in file_list]
         self.img_transfer = img_transfer
-        self.hccr_classes = hccr_classes
         self.total_img_num = 0
 
     def __enter__(self):
         file_num = len(self.file_list)
-        extra_num = 1 if not self.img_transfer else len(self.img_transfer)
-        logging.info('Expect CASIA image: {}[{}x{}x{}]'.format(
-            self.hccr_classes * file_num * extra_num, self.hccr_classes, file_num, extra_num))
+        extra_num = 0 if not self.img_transfer else len(self.img_transfer)
+        logging.info('Process {} CASIA files with extra {} images]'.
+                     format(file_num, extra_num))
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         pass

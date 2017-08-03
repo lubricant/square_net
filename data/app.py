@@ -24,7 +24,7 @@ TEMP_ROOT       [任意一个磁盘目录，在 __init__ 中定义]
 '''
 
 
-def prepare_label_dict(dict_path='tmp/labels_dict.npy'):
+def prepare_label_dict(dict_name='labels_dict.npy'):
     '''
     构建 label 字典文件并以 npy 格式保存
     生成的字典文件暂时存放在 tmp 目录
@@ -37,8 +37,7 @@ def prepare_label_dict(dict_path='tmp/labels_dict.npy'):
             for cn, _ in file:
                 chinese.append(cn)
 
-        chinese = sorted(set(chinese), key=lambda x: int(x.encode('GBK').hex(), base=16))
-        classes = [str(digit) for digit in range(10)] + chinese
+        classes = sorted(set(chinese), key=lambda x: int(x.encode('GBK').hex(), base=16))
 
         id_2_ch, ch_2_id = {}, {}
         for id in range(len(classes)):
@@ -48,17 +47,22 @@ def prepare_label_dict(dict_path='tmp/labels_dict.npy'):
 
         return id_2_ch, ch_2_id
 
+    dict_path = PWD + '/blob/' + dict_name
+    if path.exists(dict_path):
+        logging.info('File <%s> exists, please delete it before generating dict.' % dict_path)
+        return
+
     logging.info('Start preparing label dict ......')
 
-    ch_mapping, id_mapping = build_label_mapping(
-        [CasiaFile('test/' + name) for name in gf.ListDirectory(PWD + '/casia/test')])
+    forward_dict, reverse_dict = build_label_mapping(
+        [CasiaFile(name) for name in CasiaFile.list_file(use_db_v10=True, use_db_v11=True, get_test_set=True)])
 
-    np.save(PWD + '/' + dict_path, (ch_mapping, id_mapping))
+    np.save(dict_path, (forward_dict, reverse_dict))
 
     logging.info('Finish preparing label dict.')
 
 
-def prepare_image_files(file_name, data_set, img_per_file=250000, ch2idx_dict=None, img_filter=lambda _: _):
+def prepare_image_files(file_name, data_set, img_per_file=100000, ch2idx_dict=None, img_filter=lambda _: _):
     '''
     将原始图片文件转换为 TFRecord 格式的文件
     '''
@@ -128,13 +132,15 @@ if __name__ == '__main__':
                         stream=sys.stdout)
 
     from data.cv_filter import *
-    from data import IMG_SIZE
+    from data import IMG_SIZE, label_dict
 
     filter = AlignFilter(size=(IMG_SIZE, IMG_SIZE), constant_values=0)
     resize = lambda x: filter.filter(x)
 
+    _, reverse_dict = label_dict()
+
     # prepare_label_dict()
-    # prepare_image_files('training_set_%d.tfr', data_set='TRAINING', img_filter=resize)
-    # prepare_image_files('test_set_%d.tfr', data_set='TEST', img_filter=resize)
-    # prepare_image_files('mixing_set_%d.tfr', data_set='ALL', img_filter=resize)
+    # prepare_image_files('training_set_%d.tfr', data_set='TRAINING', ch2idx_dict=forward_dict, img_filter=resize)
+    # prepare_image_files('test_set_%d.tfr', data_set='TEST', ch2idx_dict=reverse_dict, img_filter=resize)
+    # prepare_image_files('mixing_set_%d.tfr', data_set='ALL', ch2idx_dict=forward_dict, img_filter=resize)
 

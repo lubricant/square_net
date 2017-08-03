@@ -9,17 +9,17 @@ from tensorflow.python import gfile as gf
 import data as this
 
 PWD = os.path.abspath(os.path.join(inspect.getfile(this), os.pardir)).replace('\\', '/')
-RECORD_ROOT = 'F:'
-TEMP_ROOT = 'G:'
+RECORD_ROOT = 'E:'
+TEMP_ROOT = 'E:'
 
-NUM_CLASSES = 10 + 3755
+NUM_CLASSES = 3755
 IMG_SIZE, IMG_CHANNEL = 112, 1
 (DS_TRAIN, DS_TEST, DS_ALL) = ('TRAIN', 'TEST', 'ALL')
 (TRAIN_SET_PREFIX, TEST_SET_PREFIX) = ('training_set', 'test_set')
 
 
 def label_dict(dict_name='labels_dict.npy'):
-    assert gf.Exists(PWD + '/blob/' + dict_name)
+    assert os.path.exists(PWD + '/blob/' + dict_name)
     return np.load(PWD + '/blob/' + dict_name)
 
 
@@ -122,5 +122,5 @@ if __name__ == '__main__':
             coord.request_stop()
             coord.join(threads)
 
+    # try_rand_queue()
 
-    try_rand_queue()
