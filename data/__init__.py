@@ -1,16 +1,15 @@
 import inspect
 import os
-import shutil
+import glob
 
-import numpy as np
 import tensorflow as tf
 from tensorflow.python import gfile as gf
 
 import data as this
 
 PWD = os.path.abspath(os.path.join(inspect.getfile(this), os.pardir)).replace('\\', '/')
-RECORD_ROOT = 'E:'
-TEMP_ROOT = 'E:'
+RECORD_ROOT = 'G:'
+TEMP_ROOT = 'G:'
 
 NUM_CLASSES = 3755
 IMG_SIZE, IMG_CHANNEL = 112, 1
@@ -26,23 +25,18 @@ def label_dict(dict_name='labels_dict.npy'):
 def data_queue(data_set, batch_size, thread_num=1, epoch_num=None):
 
     assert batch_size > 0 and thread_num > 0
-
     data_repo = {
-        DS_TRAIN: ['/record_is_ready/train_0/', '/record_is_ready/train_1/', '/record_is_ready/train_2/'],
-        DS_TEST: ['/record/test/'],
-        DS_ALL: []}
+        DS_TRAIN: RECORD_ROOT + '/record/**/' + TRAIN_SET_PREFIX + '*',
+        DS_TEST: RECORD_ROOT + '/record/**/' + TEST_SET_PREFIX + '*'}
 
-    assert data_set and data_set.upper() in data_repo
+    assert data_set and data_set.upper() in (DS_TRAIN, DS_TEST, DS_ALL)
 
     with tf.name_scope('Queue'):
-        data_set_file = []
-        data_set_list = [RECORD_ROOT + x for x in data_repo[data_set.upper()]]
-
-        assert data_set_list
-        for data_set in data_set_list:
-            assert gf.Exists(data_set) and \
-                   gf.IsDirectory(data_set)
-            data_set_file += [data_set + f for f in gf.ListDirectory(data_set)]
+        if DS_ALL == data_set.upper():
+            data_set_file = glob.glob(data_repo[DS_TRAIN]) + \
+                            glob.glob(data_repo[DS_TEST])
+        else:
+            data_set_file = glob.glob(data_repo[data_set.upper()])
 
         filename_queue = tf.train.string_input_producer(
             list(filter(lambda f: os.path.isfile(f), set(data_set_file))),
@@ -122,5 +116,5 @@ if __name__ == '__main__':
             coord.request_stop()
             coord.join(threads)
 
-    # try_rand_queue()
+    try_rand_queue()
 

@@ -118,11 +118,6 @@ def prepare_image_files(file_name, data_set, img_per_file=100000, ch2idx_dict=No
         casi_db_11 = CasiaFile.list_file(get_train_set=False, get_test_set=True, use_db_v11=True)
         start_reader('test', casi_db_10, casi_db_11, queue_writer_num=1)
 
-    if data_set.upper() == 'ALL':
-        casi_db_10 = CasiaFile.list_file(get_train_set=True, get_test_set=True, use_db_v10=True)
-        casi_db_11 = CasiaFile.list_file(get_train_set=True, get_test_set=True, use_db_v11=True)
-        start_reader('all', casi_db_10, casi_db_11, queue_writer_num=5)
-
 
 if __name__ == '__main__':
     import sys
@@ -140,7 +135,6 @@ if __name__ == '__main__':
     _, reverse_dict = label_dict()
 
     # prepare_label_dict()
-    # prepare_image_files('training_set_%d.tfr', data_set='TRAINING', ch2idx_dict=forward_dict, img_filter=resize)
-    # prepare_image_files('test_set_%d.tfr', data_set='TEST', ch2idx_dict=reverse_dict, img_filter=resize)
-    # prepare_image_files('mixing_set_%d.tfr', data_set='ALL', ch2idx_dict=forward_dict, img_filter=resize)
+    # prepare_image_files(TRAIN_SET_PREFIX+'_%d.tfr', data_set='TRAINING', ch2idx_dict=reverse_dict, img_filter=resize)
+    # prepare_image_files(TEST_SET_PREFIX+'_%d.tfr', data_set='TEST', ch2idx_dict=reverse_dict, img_filter=resize)
 

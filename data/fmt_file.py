@@ -250,6 +250,3 @@ if __name__ == '__main__':
     # try_mist()
     # try_casi()
 
-print(RECORD_ROOT + '/record_is_ready/')
-for dir_path, _, file_list in os.walk(RECORD_ROOT + '/record_is_ready/'):
-    print(dir_path, file_list)
