@@ -18,7 +18,7 @@ IMG_SIZE, IMG_CHANNEL = 112, 1
 
 
 def label_dict(dict_name='labels_dict.npy'):
-    assert gf.Exists(PWD + '/blob/' + dict_name)
+    assert os.path.exists(PWD + '/blob/' + dict_name)
     return np.load(PWD + '/blob/' + dict_name)
 
 
@@ -121,5 +121,5 @@ if __name__ == '__main__':
             coord.request_stop()
             coord.join(threads)
 
+    # try_rand_queue()
 
-    try_rand_queue()
