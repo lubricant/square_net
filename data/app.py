@@ -62,7 +62,7 @@ def prepare_label_dict(dict_name='labels_dict.npy'):
     logging.info('Finish preparing label dict.')
 
 
-def prepare_image_files(file_name, data_set, img_per_file=250000, ch2idx_dict=None, img_filter=lambda _: _):
+def prepare_image_files(file_name, data_set, img_per_file=100000, ch2idx_dict=None, img_filter=lambda _: _):
     '''
     将原始图片文件转换为 TFRecord 格式的文件
     '''
@@ -132,13 +132,15 @@ if __name__ == '__main__':
                         stream=sys.stdout)
 
     from data.cv_filter import *
-    from data import IMG_SIZE
+    from data import IMG_SIZE, label_dict
 
     filter = AlignFilter(size=(IMG_SIZE, IMG_SIZE), constant_values=0)
     resize = lambda x: filter.filter(x)
 
-    prepare_label_dict()
-    # prepare_image_files('training_set_%d.tfr', data_set='TRAINING', img_filter=resize)
-    # prepare_image_files('test_set_%d.tfr', data_set='TEST', img_filter=resize)
-    # prepare_image_files('mixing_set_%d.tfr', data_set='ALL', img_filter=resize)
+    _, reverse_dict = label_dict()
+
+    # prepare_label_dict()
+    # prepare_image_files('training_set_%d.tfr', data_set='TRAINING', ch2idx_dict=forward_dict, img_filter=resize)
+    # prepare_image_files('test_set_%d.tfr', data_set='TEST', ch2idx_dict=reverse_dict, img_filter=resize)
+    # prepare_image_files('mixing_set_%d.tfr', data_set='ALL', ch2idx_dict=forward_dict, img_filter=resize)
 

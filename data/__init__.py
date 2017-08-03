@@ -9,10 +9,10 @@ from tensorflow.python import gfile as gf
 import data as this
 
 PWD = os.path.abspath(os.path.join(inspect.getfile(this), os.pardir)).replace('\\', '/')
-RECORD_ROOT = 'F:'
-TEMP_ROOT = 'G:'
+RECORD_ROOT = 'E:'
+TEMP_ROOT = 'E:'
 
-NUM_CLASSES = 10 + 3755
+NUM_CLASSES = 3755
 IMG_SIZE, IMG_CHANNEL = 112, 1
 (DS_TRAIN, DS_TEST, DS_ALL) = ('TRAIN', 'TEST', 'ALL')
 
