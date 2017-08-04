@@ -49,9 +49,14 @@ def data_queue(data_set, batch_size, thread_num=1, epoch_num=None):
                 'index': tf.FixedLenFeature([], tf.int64),
                 'image': tf.FixedLenFeature([], tf.string)})
 
+        pad = (120 - IMG_SIZE) // 2
+        assert pad > 0 and (pad*2) + IMG_SIZE == 120
+        padding = [[pad, pad], [pad, pad], [0, 0]]
+
         labels = tf.cast(features['index'], tf.int32)
-        images = tf.reshape((tf.cast(tf.decode_raw(features['image'], tf.uint8), tf.float32) / 255. - .5),
-                            [IMG_SIZE, IMG_SIZE, IMG_CHANNEL])
+        images = tf.cast(tf.pad(tf.reshape(
+                    tf.decode_raw(features['image'], tf.uint8),
+                    [IMG_SIZE, IMG_SIZE, IMG_CHANNEL]), padding), tf.float32) / 255. - .5
 
         rand_data_queue = tf.train.shuffle_batch([images, labels],
                                                  batch_size=batch_size,
@@ -93,7 +98,7 @@ if __name__ == '__main__':
             coord.join(threads)
 
     def try_rand_queue():
-        image_batch, label_batch = data_queue(data_set=DS_TRAIN, batch_size=100, epoch_num=1)
+        image_batch, label_batch = data_queue(data_set=DS_TEST, batch_size=100, epoch_num=1)
         init_op = tf.group(tf.initialize_all_variables(),
                            tf.initialize_local_variables())
         with tf.Session() as sess:
@@ -109,9 +114,9 @@ if __name__ == '__main__':
                 # gabor_filter = GaborFilter((100, 100))
                 # gabor_part = np.array()
 
-                # img = image[0]
-                # plt.imshow(img.reshape(img.shape[:-1]), cmap='gray')
-                # plt.show()
+                img = image[0]
+                plt.imshow(img.reshape(img.shape[:-1]), cmap='gray')
+                plt.show()
 
             coord.request_stop()
             coord.join(threads)

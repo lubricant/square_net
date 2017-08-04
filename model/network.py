@@ -15,7 +15,8 @@ class HCCR_GoogLeNet(object):
 
         FLAGS = tf.app.flags.FLAGS
 
-        self.images = layer.data('Input', [None, FLAGS.image_size, FLAGS.image_size, FLAGS.image_channel])
+        assert FLAGS.image_size <= 120
+        self.images = layer.data('Input', [None, 120, 120, FLAGS.image_channel])
         self.labels = layer.data('Label', [None], tf.int64)
 
         self.conv1 = layer.convolution('Conv_7x7x64', [7, 7, 64], 2, random='gauss:0.015')(self.images)
@@ -64,7 +65,8 @@ class HCCR_GoogLeNet(object):
         self.dropout = layer.dropout('Dropout_FC_1024')(self.fc)
         self.keep_prob = self.dropout.keep_prob
 
-        self.logits = layer.density('FC_%d' % FLAGS.label_num, FLAGS.label_num, linear=True)(self.dropout)
+        assert FLAGS.label_num == 3755
+        self.logits = layer.density('FC_3755', 3755, linear=True)(self.dropout)
 
         self.loss = layer.loss('Loss')(self.logits, self.labels)
 
