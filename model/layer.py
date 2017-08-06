@@ -5,6 +5,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow.contrib as tfc
 
+from tensorflow.python.ops import init_ops, array_ops
 
 from model.layer import *
 
@@ -38,7 +39,7 @@ def __attach_ops(tensor, **args):
     op_list = __Dict()
     op_list.update(args)
     __attach_attr(op_list, **args)
-    __attach_attr(tensor, ops=args)
+    __attach_attr(tensor, ops=op_list)
 
 
 def __attach_vars(tensor, **args):
@@ -68,7 +69,7 @@ def __initializer(mode=None):
         return tfc.layers.variance_scaling_initializer(factor=1.0, uniform=True)
 
     if mode == 'xavier':  # xavier with fan_avg
-        return tf.glorot_uniform_initializer()
+        return init_ops.glorot_normal_initializer()
 
     if mode.startswith('gauss'):
         stddev = gauss_with_opt.findall(mode)
@@ -226,11 +227,12 @@ def inception(name, *graph, training=True):
             types1 = set(map(lambda _key: _key if types1.count(_key) == 1 else None, node_factory.keys()))
 
             b1_types = list(map(lambda _branch: _branch[0][0], filter(lambda _branch: len(_branch) == 1, graph)))
-            b1_types = set(map(lambda _key: _key if b1_types.count(_key) == 1 else None, node_factory.keys()))
+            b1_types = set(map(lambda _key: _key if b1_types.count(_key) == 1 and _key not in types1 else None, node_factory.keys()))
 
             node_stack, node_path = [], []
             for branch in graph:
                 node, path, is_b1 = value, [], len(branch) == 1
+
                 for x in branch:
                     node_type, node_depth = x[0:2]
                     assert node_type in node_factory
@@ -242,6 +244,11 @@ def inception(name, *graph, training=True):
                     if not node_alias:
                         if not is_b1 and node_type not in b1_types and node_type not in types1:
                             node_alias = node_type + '-' + str(node_depth)
+                        else:
+                            if node_type in b1_types:
+                                b1_types.remove(node_type)
+                            if node_type in types1:
+                                types1.remove(node_type)
 
                     node = node_factory[node_type](node_args, node_alias, node_depth, node)
                     path.append((node_type, node))
@@ -263,6 +270,7 @@ def dropout(name, **args):
 
             __attach_vars(drop, keep_prob=keep_prob)
             return __attach_attr(drop, naming=name)
+    return __
 
 
 def normalization(name, mode, training=True,
