@@ -1,12 +1,22 @@
 import re
+from functools import reduce
+
 import numpy as np
 import tensorflow as tf
+import tensorflow.contrib as tfc
+
+
+from model.layer import *
+
+
+class __Dict(dict):
+    pass
 
 
 def __assert_shape(shape, *dim):
-    assert isinstance(shape, (list, tuple)) and \
-           all(x is None or isinstance(x, int) for x in shape) and \
-           len(shape) in dim
+    assert isinstance(shape, (list, tuple, tf.TensorShape))
+    assert all(x is None or isinstance(x, (int, tf.Dimension)) for x in shape)
+    assert len(shape) in dim
 
 
 def __assert_value(value, *args):
@@ -24,8 +34,24 @@ def __attach_attr(obj, **args):
     return obj
 
 
-def __random_init(shape, mode):
-    __assert_shape(shape, 2, 4)
+def __attach_ops(tensor, **args):
+    op_list = __Dict()
+    op_list.update(args)
+    __attach_attr(op_list, **args)
+    __attach_attr(tensor, ops=args)
+
+
+def __attach_vars(tensor, **args):
+    var_list = __Dict()
+    var_list.update(args)
+    __attach_attr(var_list, **args)
+    __attach_attr(tensor, vars=var_list)
+
+
+def __initializer(mode=None):
+
+    if not mode:
+        return tf.zeros_initializer()
 
     gauss_with_opt = re.compile('^gauss:([-+]?[0-9]*\.?[0-9]+)$', re.I)
     xavier_with_opt = re.compile('^xavier:(in|out|avg)$', re.I)
@@ -35,38 +61,26 @@ def __random_init(shape, mode):
 
     mode = mode.lower()
 
-    if len(shape) == 2:  # density
-        fan_in, fan_out = shape
-    else:  # convolution
-        k_size = np.prod(shape[:2])
-        fan_in = float(k_size * shape[2])
-        fan_out = float(k_size * shape[3])
+    if mode == 'msra':  # np.random.randn(n) * sqrt(2.0/fan_in) [ReLU]
+        return tfc.layers.variance_scaling_initializer()
 
-    if mode == 'msra':
-        stddev = 2.0 / fan_in
-        trunc_stddev = np.sqrt(1.3 * stddev)
-        with tf.name_scope('msra_init'):
-            return tf.truncated_normal(shape, 0.0, trunc_stddev, tf.float32)
+    if mode == 'caffe':  # xavier with fan_in
+        return tfc.layers.variance_scaling_initializer(factor=1.0, uniform=True)
+
+    if mode == 'xavier':  # xavier with fan_avg
+        return tf.glorot_uniform_initializer()
 
     if mode.startswith('gauss'):
         stddev = gauss_with_opt.findall(mode)
-        stddev = 0.01 if not stddev else float(stddev[0])
-        with tf.name_scope('gauss_init'):
-            return tf.truncated_normal(shape, 0.0, stddev, tf.float32)
+        stddev = None if not stddev else float(stddev[0])
+        if stddev:  # normal with 0 mean and specific stddev
+            return tf.truncated_normal_initializer(stddev=stddev)
+        else:  # np.random.randn(n) / sqrt(fan_in) [tanH]
+            return tfc.layers.variance_scaling_initializer(factor=1.0)
 
-    n = 0
-    if mode == 'xavier' or mode.endswith('avg'):
-        mode, n = 'xavier', ((fan_in + fan_out) / 2.)
-
-    if mode == 'caffe' or mode.endswith('in'):
-        mode, n = 'caffe', fan_in
-
-    if mode.endswith('out'):
-        mode, n = 'xavier_fo', fan_out
-
-    limit = np.sqrt(3.0 / n)
-    with tf.name_scope('%s_init' % mode):
-        return tf.random_uniform(shape, -limit, limit, tf.float32)
+    fan_opt = xavier_with_opt.findall(mode)
+    fan_type = 'AVG' if not fan_opt else fan_opt[0].upper()
+    return tfc.layers.variance_scaling_initializer(factor=1.0, uniform=True, mode='FAN_'+fan_type)
 
 
 def data(name, shape, dtype=tf.float32):
@@ -74,7 +88,8 @@ def data(name, shape, dtype=tf.float32):
     __assert_shape(shape, 1, 2, 4)  # [batch, height, width, channel] [batch, num_classes] [batch] = shape
     __assert_value(dtype, tf.float16, tf.float32, tf.float64, tf.int8, tf.int16, tf.int32, tf.int64)
 
-    return __attach_attr(tf.placeholder(dtype, shape, name), layer_name=name)
+    with tf.name_scope(name):
+        return __attach_attr(tf.placeholder(dtype, shape, name='data'), naming=name)
 
 
 def loss(name):
@@ -87,13 +102,14 @@ def loss(name):
                   if len(labels.shape) == 2 else
                   tf.nn.sparse_softmax_cross_entropy_with_logits)  # batch_size = labels.shape
 
-        cross_entropy = l_func(logits=logits, labels=labels, name=name)
-        return __attach_attr(tf.reduce_mean(cross_entropy), layer_name=name, cross_entropy=cross_entropy)
+        with tf.name_scope(name):
+            cross_entropy = l_func(logits=logits, labels=labels, name='cross_entropy')
+            return __attach_attr(tf.reduce_mean(cross_entropy), naming=name)
 
     return __
 
 
-def convolution(name, k_shape, stride=1, padding='VALID', random='xavier'):
+def convolution(name, k_shape, stride=1, padding='VALID', random='xavier', training=True):
     __assert_type(name, str)
     __assert_type(stride, int)
     __assert_value(padding.upper(), 'VALID', 'SAME')
@@ -104,19 +120,21 @@ def convolution(name, k_shape, stride=1, padding='VALID', random='xavier'):
         k_height, k_width, out_channel = k_shape
         in_channel = value.shape.as_list()[-1]
 
-        with tf.name_scope(name):
+        with tf.variable_scope(name):
             shape = [k_height, k_width, in_channel, out_channel]
 
-            filt = tf.Variable(__random_init(shape, random), name='filt')
+            filt = tf.get_variable('weight', shape, initializer=__initializer(random), trainable=training)
             conv = tf.nn.conv2d(value, filt, [1, stride, stride, 1], padding.upper())
-            bias = tf.Variable(tf.zeros(conv.shape[-1]), name='bias')
+            bias = tf.get_variable('bias', conv.shape[-1:], initializer=__initializer(), trainable=training)
             relu = tf.nn.relu(tf.nn.bias_add(conv, bias))
-            return __attach_attr(relu, layer_name=name, weight=filt, bias=bias)
+            __attach_ops(relu, conv=conv, active=relu)
+            __attach_vars(relu, weight=filt, bias=bias)
+            return __attach_attr(relu, naming=name)
 
     return __
 
 
-def pooling(name, p_shape, p_type, stride=1, padding='VALID'):
+def pooling(name, p_shape, p_type, stride=1, padding='VALID', training=True):
     __assert_type(name, str)
     __assert_type(p_type, str)
     __assert_type(stride, int)
@@ -124,98 +142,177 @@ def pooling(name, p_shape, p_type, stride=1, padding='VALID'):
     __assert_value(padding.upper(), 'VALID', 'SAME')
     __assert_shape(p_shape, 2, 3)  # p_height, p_width[, p_depth] = p_shape
 
-    if len(p_shape) == 2:
-        p_shape = [1] + p_shape + [1]
-        stride = [1, stride, stride, 1]
-        p_func = tf.nn.max_pool if p_type.upper() == 'MAX' else tf.nn.avg_pool
-        return lambda value: __attach_attr(
-            p_func(value, p_shape, stride, padding.upper(), name=name), layer_name=name, weight=None, bias=None)
-
     def __(value):
-        v_depth = value.shape.as_list()[-1]
-        p_height, p_width, p_depth = p_shape
-        assert p_depth == v_depth * 2
 
-        with tf.name_scope(name):
-            conv = convolution('conv', [p_height, p_width, p_depth-v_depth],
-                               stride=stride, padding=padding)(value)
-            pool = pooling('pool', [p_height, p_width], p_type=p_type,
-                           stride=stride, padding=padding)(value)
-            return __attach_attr(
-                tf.concat([conv, pool], axis=-1, name='depth_concat'), layer_name=name, weight=conv.weight, bias=conv.bias)
+        # if not specific depth of pooling
+        if len(p_shape):
+            p_func = tf.nn.max_pool if p_type.upper() == 'MAX' else tf.nn.avg_pool
+            with tf.name_scope(name):
+                pool = p_func(value, [1] + p_shape + [1], [1, stride, stride, 1], padding.upper(), name=p_type.lower()+'_pool')
+                __attach_ops(pool, conv=None, pool=pool)
+                return __attach_attr(pool, naming=name, conv=None, pool=pool)
+
+        else:  # if specific depth of pooling
+            v_depth = value.shape.as_list()[-1]
+            p_height, p_width, p_depth = p_shape
+            assert p_depth == v_depth * 2
+
+            with tf.variable_scope(name):
+                conv = convolution('conv', [p_height, p_width, p_depth-v_depth], stride=stride, padding=padding, training=training)(value)
+                pool = pooling('pool', [p_height, p_width], p_type=p_type, stride=stride, padding=padding, training=training)(value)
+                concat = tf.concat([conv, pool], axis=-1, name='depth_concat')
+                __attach_ops(concat, conv=None, pool=pool)
+                return __attach_attr(concat, naming=name)
 
     return __
 
 
-def density(name, neurons, linear=False, random='gauss'):
+def density(name, neurons, linear=False, random='gauss', training=True):
     __assert_type(name, str)
     __assert_type(neurons, int)
 
     def __(value):
-        with tf.name_scope(name):
+        with tf.variable_scope(name):
             value = tf.reshape(value, [-1, np.prod(value.shape[1:].as_list())])
 
             shape = value.shape[1:].as_list() + [neurons]
-            weight = tf.Variable(__random_init(shape, random), name='weight')
-            bias = tf.Variable(tf.zeros([neurons]), name='bias')
+            weight = tf.get_variable('weight', shape, initializer=__initializer(random), trainable=training)
+            bias = tf.get_variable('bias', [neurons], initializer=__initializer(), trainable=training)
             fc = tf.nn.bias_add(tf.matmul(value, weight), bias)
-            return __attach_attr(fc if linear else tf.nn.relu(fc), layer_name=name, weight=weight, bias=bias)
+            act = None if linear else tf.nn.relu(fc)
+
+            dense = fc if linear else act
+            __attach_ops(dense, dense=fc, active=act)
+            __attach_vars(dense, weight=weight, bias=bias)
+            return __attach_attr(dense, naming=name)
 
     return __
 
 
-def normalization(name, depth_radius=5, alpha=1, beta=0.5):
-    return lambda value: __attach_attr(tf.nn.local_response_normalization(
-        value, depth_radius=depth_radius, alpha=alpha, beta=beta, name=name), layer=name)
-
-
-def dropout(name, **args):
-    with tf.name_scope(name):
-        keep_prob = tf.placeholder(tf.float32, name='keep_prob')
-        return lambda value: __attach_attr(
-            tf.nn.dropout(value, name='dropout', keep_prob=keep_prob, **args), layer_name=name, keep_prob=keep_prob)
-
-
-def inception(name, *graph):
+def inception(name, *graph, training=True):
     assert graph and \
            all(isinstance(x, list) for x in graph) and \
            all(all(isinstance(x, tuple) and len(x) in (2, 3) for x in pipeline) for pipeline in graph)
 
     node_factory = {
         'conv_1x1':
-            lambda args, depth, value: convolution('conv_1x1', [1, 1, depth], **args)(value),
+            lambda args, alias, depth, value: convolution(
+                'conv_1x1' if not alias else alias, [1, 1, depth], **args)(value),
         'conv_3x3':
-            lambda args, depth, value: convolution('conv_3x3', [3, 3, depth], **args)(value),
+            lambda args, alias, depth, value: convolution(
+                'conv_3x3' if not alias else alias, [3, 3, depth], **args)(value),
         'conv_5x5':
-            lambda args, depth, value: convolution('conv_5x5', [5, 5, depth], **args)(value),
+            lambda args, alias, depth, value: convolution(
+                'conv_5x5' if not alias else alias, [5, 5, depth], **args)(value),
         'conv_1x7':
-            lambda args, depth, value: convolution('conv_1x7', [1, 7, depth], **args)(value),
+            lambda args, alias, depth, value: convolution(
+                'conv_1x7' if not alias else alias, [1, 7, depth], **args)(value),
         'conv_7x1':
-            lambda args, depth, value: convolution('conv_7x1', [7, 1, depth], **args)(value),
+            lambda args, alias, depth, value: convolution(
+                'conv_7x1' if not alias else alias, [7, 1, depth], **args)(value),
         'pool_3x3':
-            lambda args, depth, value: convolution('pool_proj', [1, 1, depth], **args)(
-                                           pooling('pool_3x3', [3, 3], 'MAX', padding='SAME')(value)),
+            lambda args, alias, depth, value: convolution(
+                'pool_proj' if not alias else alias, [1, 1, depth], **args)(pooling(
+                'pool_3x3' if not alias else alias+'_'+'pool_3x3', [3, 3], 'MAX', padding='SAME')(value)),
     }
 
     def __(value):
 
-        with tf.name_scope(name):
+        with tf.variable_scope(name):
 
-            default_args = {'padding': 'same', 'random': 'xavier'}
+            default_args = {'padding': 'same', 'random': 'xavier', 'training': training}
+
+            types1 = reduce(lambda _nn, _branch: _nn + reduce(lambda _n, _node: _n + list(_node[0:1]), _branch, []), graph, [])
+            types1 = set(map(lambda _key: _key if types1.count(_key) == 1 else None, node_factory.keys()))
+
+            b1_types = list(map(lambda _branch: _branch[0][0], filter(lambda _branch: len(_branch) == 1, graph)))
+            b1_types = set(map(lambda _key: _key if b1_types.count(_key) == 1 else None, node_factory.keys()))
 
             node_stack, node_path = [], []
-            for pipeline in graph:
-                node, path = value, []
-                for x in pipeline:
+            for branch in graph:
+                node, path, is_b1 = value, [], len(branch) == 1
+                for x in branch:
                     node_type, node_depth = x[0:2]
-                    node_args = default_args if len(x) <= 2 else x[2]
                     assert node_type in node_factory
-                    node = node_factory[node_type](node_args, node_depth, node)
+
+                    node_args = default_args if len(x) <= 2 else x[2]
+                    node_args['training'] = training
+
+                    node_alias = node_args['name'] if 'name' in node_args else None
+                    if not node_alias:
+                        if not is_b1 and node_type not in b1_types and node_type not in types1:
+                            node_alias = node_type + '-' + str(node_depth)
+
+                    node = node_factory[node_type](node_args, node_alias, node_depth, node)
                     path.append((node_type, node))
                 node_stack.append(node)
                 node_path.append(path)
 
-            return __attach_attr(tf.concat(node_stack, axis=-1, name='depth_concat'),
-                                 layer_name=name, branch_graph=tuple(node_path))
+            concat = tf.concat(node_stack, axis=-1, name='depth_concat')
+            __attach_ops(concat, graph=tuple(node_path))
+            return __attach_attr(concat, naming=name)
 
     return __
+
+
+def dropout(name, **args):
+    def __(value):
+        with tf.name_scope(name):
+            keep_prob = tf.placeholder(tf.float32, name='keep_prob')
+            drop = tf.nn.dropout(value, name='dropout', keep_prob=keep_prob, **args)
+
+            __attach_vars(drop, keep_prob=keep_prob)
+            return __attach_attr(drop, naming=name)
+
+
+def normalization(name, mode, training=True,
+                  batch_scale=False, batch_shift=True, batch_epsilon=0.001, batch_decay=.999,
+                  local_depth=5, local_bias=1., local_alpha=1., local_beta=.5):
+
+    __assert_value(mode.upper(), 'LOCAL', 'BATCH')
+
+    def local_resp_norm(value):
+        with tf.name_scope(name):
+            norm = tf.nn.local_response_normalization(
+                value, name='local_resp_norm',
+                depth_radius=local_depth, bias=local_bias, alpha=local_alpha, beta=local_beta)
+
+            __attach_ops(norm, norm=norm)
+            return __attach_attr(norm, naming=name)
+
+    def batch_norm(value):
+
+        with tf.variable_scope(name):
+            __assert_shape(value.get_shape(), 2, 4)  # density or conv2d
+
+            shape = value.get_shape().as_list()
+            channel = shape[-1]
+
+            if len(shape) == 2:
+                value = tf.reshape(value, [-1, 1, 1, channel], 'flatten')
+
+            scale = tf.get_variable('gamma', channel, initializer=tf.ones_initializer(), trainable=training and batch_scale)
+            shift = tf.get_variable('beta', channel, initializer=tf.zeros_initializer(), trainable=training and batch_shift)
+
+            norm, mean, variance = tf.nn.fused_batch_norm(
+                value, name='batch_norm', scale=scale, offset=shift, epsilon=batch_epsilon, is_training=training)
+
+            if not training:
+                ema_mean = tf.get_variable('mean', channel, initializer=tf.zeros_initializer(), trainable=False)
+                ema_variance = tf.get_variable('variance', channel, initializer=tf.ones_initializer(), trainable=False)
+
+                from tensorflow.python.training import moving_averages as ema
+                update_mean = ema.assign_moving_average(ema_mean, mean, decay=batch_decay)
+                update_variance = ema.assign_moving_average(ema_variance, variance, decay=batch_decay)
+                with tf.control_dependencies([update_mean, update_variance]):
+                    norm = tf.identity(norm)
+
+            if len(shape) == 2:
+                norm = tf.reshape(norm, shape, 'stack')
+
+            __attach_ops(norm, norm=norm)
+            __attach_vars(norm, scale=scale, shift=shift)
+            return __attach_attr(norm, naming=name)
+
+    return local_resp_norm if mode.upper() == 'LOCAL' else batch_norm
+
