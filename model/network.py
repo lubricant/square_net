@@ -5,12 +5,12 @@ import model.layer as layer
 
 class HCCR_GoogLeNet(object):
 
-    def __init__(self):
+    def __init__(self, is_training=True):
         with tf.name_scope('HCCR-GoogLeNet'):
-            self.__build_network()
+            self.__build_network(is_training)
         self.__build_summary()
 
-    def __build_network(self):
+    def __build_network(self, training):
         assert not tf.get_variable_scope().original_name_scope
 
         FLAGS = tf.app.flags.FLAGS
@@ -21,11 +21,11 @@ class HCCR_GoogLeNet(object):
 
         self.conv1 = layer.convolution('Conv_7x7x64', [7, 7, 64], 2, random='gauss:0.015')(self.images)
         self.pool1 = layer.pooling('MaxPool_3x3', [3, 3], 'MAX', stride=2)(self.conv1)
-        self.norm1 = layer.normalization('LocalRespNorm_1', 'LOCAL', local_alpha=0.0001, local_beta=0.75)(self.pool1)
+        self.norm1 = layer.normalization('LRN_1', 'LOCAL', local_alpha=0.0001, local_beta=0.75)(self.pool1)
 
         self.conv2 = layer.convolution('Conv_1x1x64', [1, 1, 64])(self.norm1)
         self.conv3 = layer.convolution('Conv_3x3x192', [3, 3, 192], padding='SAME')(self.conv2)
-        self.norm2 = layer.normalization('LocalRespNorm_2', 'LOCAL', local_alpha=0.0001, local_beta=0.75)(self.conv3)
+        self.norm2 = layer.normalization('LRN_2', 'LOCAL', local_alpha=0.0001, local_beta=0.75)(self.conv3)
         self.pool2 = layer.pooling('MaxPool_3x3', [3, 3], 'MAX', stride=2)(self.norm2)
 
         self.incp1 = layer.inception('Inception_v1_1',
@@ -115,5 +115,3 @@ class HCCR_GoogLeNet(object):
 
         with tf.name_scope('FullyConnected'):
             show_weight_and_bias(self.fc, self.logits)
-
-HCCR_GoogLeNet()

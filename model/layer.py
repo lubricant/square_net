@@ -1,13 +1,14 @@
 import re
+import sys
+import inspect
 from functools import reduce
+from contextlib import contextmanager
 
 import numpy as np
 import tensorflow as tf
 import tensorflow.contrib as tfc
 
-from tensorflow.python.ops import init_ops, array_ops
-
-from model.layer import *
+from tensorflow.python.ops import init_ops
 
 
 class __Dict(dict):
@@ -18,14 +19,17 @@ def __assert_shape(shape, *dim):
     assert isinstance(shape, (list, tuple, tf.TensorShape))
     assert all(x is None or isinstance(x, (int, tf.Dimension)) for x in shape)
     assert len(shape) in dim
+    return True
 
 
 def __assert_value(value, *args):
     assert value in args
+    return True
 
 
 def __assert_type(value, *args):
     assert isinstance(value, args)
+    return True
 
 
 def __attach_attr(obj, **args):
@@ -63,10 +67,10 @@ def __initializer(mode=None):
     mode = mode.lower()
 
     if mode == 'msra':  # np.random.randn(n) * sqrt(2.0/fan_in) [ReLU]
-        return tfc.layers.variance_scaling_initializer()
+        return init_ops.variance_scaling_initializer(scale=2.)
 
     if mode == 'caffe':  # xavier with fan_in
-        return tfc.layers.variance_scaling_initializer(factor=1.0, uniform=True)
+        return init_ops.variance_scaling_initializer(scale=1., distribution='uniform')
 
     if mode == 'xavier':  # xavier with fan_avg
         return init_ops.glorot_normal_initializer()
@@ -75,13 +79,13 @@ def __initializer(mode=None):
         stddev = gauss_with_opt.findall(mode)
         stddev = None if not stddev else float(stddev[0])
         if stddev:  # normal with 0 mean and specific stddev
-            return tf.truncated_normal_initializer(stddev=stddev)
+            return init_ops.truncated_normal_initializer(stddev=stddev)
         else:  # np.random.randn(n) / sqrt(fan_in) [tanH]
-            return tfc.layers.variance_scaling_initializer(factor=1.0)
+            return init_ops.variance_scaling_initializer(scale=1)
 
     fan_opt = xavier_with_opt.findall(mode)
-    fan_type = 'AVG' if not fan_opt else fan_opt[0].upper()
-    return tfc.layers.variance_scaling_initializer(factor=1.0, uniform=True, mode='FAN_'+fan_type)
+    fan_type = 'avg' if not fan_opt else fan_opt[0].lower()
+    return init_ops.variance_scaling_initializer(scale=1., distribution='uniform', mode='fan_'+fan_type)
 
 
 def data(name, shape, dtype=tf.float32):
@@ -324,3 +328,49 @@ def normalization(name, mode, training=True,
 
     return local_resp_norm if mode.upper() == 'LOCAL' else batch_norm
 
+
+@contextmanager
+def default(layers, **params):
+
+    funcs = _Scope.scope_funcs
+
+    if inspect.isfunction(layers) or isinstance(layers, str):
+        layers = [layers]
+
+    assert __assert_type(layers, list, tuple)
+    assert all(__assert_value(x, funcs.keys()) or __assert_value(x, funcs.values()) for x in layers)
+
+    scope = _Scope(layers, **params)
+    yield
+    del scope
+
+
+class _Scope(object):
+
+    scope_funcs = dict(inspect.getmembers(sys.modules[__name__], lambda x: inspect.isfunction(x)))
+    scope_stack = []
+
+    @staticmethod
+    def parse_param(layers, params):
+        pass
+
+    @staticmethod
+    def merge_param(layer, params):
+        assert layer in _Scope.scope_funcs.values()
+
+        default_param = {}
+        if _Scope.scope_stack and layer in _Scope.scope_stack[-1].param_ctx:
+            default_param = _Scope.scope_stack[-1].param_ctx[layer]
+
+        merged_param = {}
+        merged_param.update(default_param)
+        merged_param.update(params)
+        return merged_param
+
+    def __init__(self, layers, **params):
+        self.params_ctx = {}
+        parent = None if _Scope.scope_stack else _Scope.scope_stack[-1]
+        _Scope.scope_stack.append(self)
+
+    def __del__(self):
+        _Scope.scope_stack.pop()
