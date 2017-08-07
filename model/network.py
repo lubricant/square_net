@@ -6,12 +6,11 @@ import model.layer as layer
 class HCCR_GoogLeNet(object):
 
     def __init__(self, is_training=True):
-        with tf.name_scope('HCCR-GoogLeNet'):
+        with tf.variable_scope('HCCR-GoogLeNet'):
             self.__build_network(is_training)
         self.__build_summary()
 
     def __build_network(self, training):
-        assert not tf.get_variable_scope().original_name_scope
 
         FLAGS = tf.app.flags.FLAGS
 
