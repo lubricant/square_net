@@ -13,20 +13,7 @@ from tensorflow.python.ops import init_ops
 
 
 class _Dict(dict):
-
-    def take(self, spec_val, **def_val):
-        assert isinstance(spec_val, list)
-        assert len(spec_val) == len(def_val)
-        params = []
-        for param in zip(spec_val, def_val.items()):
-            spec_v, def_p = param
-            name_p, def_v = def_p
-            assert def_v is not None
-            if spec_v is not None:
-                params.append(spec_v)
-            else:
-                params.append(self.get(name_p, def_v))
-        return params
+    pass
 
 
 def __assert_shape(shape, *dim):
@@ -102,16 +89,17 @@ def __initializer(mode=None):
     return init_ops.variance_scaling_initializer(scale=1., distribution='uniform', mode='fan_'+fan_type)
 
 
-def data(name, shape, dtype=None):
-    params = _Scope.default_param(data, locals())
-    dtype, = params.take([dtype], dtype=tf.float32)
+def data(name, shape, data_type=None):
+
+    _ = _Scope.default_param(data)
+    data_type = _(data_type, data_type=tf.float32)
 
     __assert_type(name, str)
     __assert_shape(shape, 1, 2, 4)  # [batch, height, width, channel] [batch, num_classes] [batch] = shape
-    __assert_value(dtype, tf.float16, tf.float32, tf.float64, tf.int8, tf.int16, tf.int32, tf.int64)
+    __assert_value(data_type, tf.float16, tf.float32, tf.float64, tf.int8, tf.int16, tf.int32, tf.int64)
 
     with tf.name_scope(name):
-        return __attach_attr(tf.placeholder(dtype, shape, name='data'), naming=name)
+        return __attach_attr(tf.placeholder(data_type, shape, name='data'), naming=name)
 
 
 def loss(name):
@@ -131,14 +119,14 @@ def loss(name):
     return __
 
 
-def convolution(name, k_shape, stride=None, padding=None, random=None, training=None, dtype=None):
+def convolution(name, k_shape, stride=None, padding=None, random=None, training=None, data_type=None):
 
-    params = _Scope.default_param(convolution)
-    stride = params.take(stride, stride=1)
-    padding = params.take(padding, padding='VALID')
-    random = params.take(random, random='xavier')
-    params.take([])
-    training, dtype = params.take([training, dtype], training=True, dtype=tf.float32)
+    __ = _Scope.default_param(convolution)
+    stride = __(stride, stride=1)
+    random = __(random, random='xavier')
+    padding = __(padding, padding='valid')
+    training = __(training, training=True)
+    data_type = __(data_type, data_type=tf.float32)
 
     __assert_type(name, str)
     __assert_type(stride, int)
@@ -153,9 +141,9 @@ def convolution(name, k_shape, stride=None, padding=None, random=None, training=
         with tf.variable_scope(name):
             shape = [k_height, k_width, in_channel, out_channel]
 
-            filt = tf.get_variable('weight', shape, initializer=__initializer(random), trainable=training, dtype=dtype)
+            filt = tf.get_variable('weight', shape, initializer=__initializer(random), trainable=training, dtype=data_type)
             conv = tf.nn.conv2d(value, filt, [1, stride, stride, 1], padding.upper())
-            bias = tf.get_variable('bias', conv.shape[-1:], initializer=__initializer(), trainable=training, dtype=dtype)
+            bias = tf.get_variable('bias', conv.shape[-1:], initializer=__initializer(), trainable=training, dtype=data_type)
             relu = tf.nn.relu(tf.nn.bias_add(conv, bias))
             __attach_ops(relu, conv=conv, active=relu)
             __attach_vars(relu, weight=filt, bias=bias)
@@ -164,18 +152,20 @@ def convolution(name, k_shape, stride=None, padding=None, random=None, training=
     return __
 
 
-def pooling(name, p_shape, p_type, stride=None, padding=None, training=None, dtype=None):
+def pooling(name, p_shape, mode=None, stride=None, padding=None, training=None, data_type=None):
 
-    params = _Scope.default_param(pooling)
-    stride = params.take(stride, stride=1)
-    padding = params.take(padding, padding='VALID')
-    training = params.take(training, training=True)
-    dtype = params.take(dtype, dtype=tf.float32)
+    __ = _Scope.default_param(pooling)
+    mode = __(mode, mode='MAX')
+    stride = __(stride, stride=1)
+    stride = __(stride, stride=1)
+    padding = __(padding, padding='valid')
+    training = __(training, training=True)
+    data_type = __(data_type, data_type=tf.float32)
 
     __assert_type(name, str)
-    __assert_type(p_type, str)
+    __assert_type(mode, str)
     __assert_type(stride, int)
-    __assert_value(p_type.upper(), 'MAX', 'AVG')
+    __assert_value(mode.upper(), 'MAX', 'AVG')
     __assert_value(padding.upper(), 'VALID', 'SAME')
     __assert_shape(p_shape, 2, 3)  # p_height, p_width[, p_depth] = p_shape
 
@@ -183,9 +173,9 @@ def pooling(name, p_shape, p_type, stride=None, padding=None, training=None, dty
 
         # if not specific depth of pooling
         if len(p_shape):
-            p_func = tf.nn.max_pool if p_type.upper() == 'MAX' else tf.nn.avg_pool
+            p_func = tf.nn.max_pool if mode.upper() == 'MAX' else tf.nn.avg_pool
             with tf.name_scope(name):
-                pool = p_func(value, [1] + p_shape + [1], [1, stride, stride, 1], padding.upper(), name=p_type.lower()+'_pool')
+                pool = p_func(value, [1] + p_shape + [1], [1, stride, stride, 1], padding.upper(), name=mode.lower() + '_pool')
                 __attach_ops(pool, conv=None, pool=pool)
                 return __attach_attr(pool, naming=name, conv=None, pool=pool)
 
@@ -195,8 +185,8 @@ def pooling(name, p_shape, p_type, stride=None, padding=None, training=None, dty
             assert p_depth == v_depth * 2
 
             with tf.variable_scope(name):
-                conv = convolution('conv', [p_height, p_width, p_depth-v_depth], stride=stride, padding=padding, training=training, dtype=dtype)(value)
-                pool = pooling('pool', [p_height, p_width], p_type=p_type, stride=stride, padding=padding, training=training)(value)
+                conv = convolution('conv', [p_height, p_width, p_depth-v_depth], stride=stride, padding=padding, training=training, dtype=data_type)(value)
+                pool = pooling('pool', [p_height, p_width], mode=mode, stride=stride, padding=padding, training=training)(value)
                 concat = tf.concat([conv, pool], axis=-1, name='depth_concat')
                 __attach_ops(concat, conv=None, pool=pool)
                 return __attach_attr(concat, naming=name)
@@ -204,13 +194,13 @@ def pooling(name, p_shape, p_type, stride=None, padding=None, training=None, dty
     return __
 
 
-def density(name, neurons, linear=None, random=None, training=None, dtype=None):
+def density(name, neurons, linear=None, random=None, training=None, data_type=None):
 
-    params = _Scope.default_param(density)
-    linear = params.take(linear, linear=False)
-    random = params.take(random, random='gauss')
-    training = params.take(training, training=True)
-    dtype = params.take(dtype, dtype=tf.float32)
+    __ = _Scope.default_param(density)
+    linear = __(linear, linear=False)
+    random = __(random, random='gauss')
+    training = __(training, training=True)
+    data_type = __(data_type, data_type=tf.float32)
 
     __assert_type(name, str)
     __assert_type(neurons, int)
@@ -220,8 +210,8 @@ def density(name, neurons, linear=None, random=None, training=None, dtype=None):
             value = tf.reshape(value, [-1, np.prod(value.shape[1:].as_list())])
 
             shape = value.shape[1:].as_list() + [neurons]
-            weight = tf.get_variable('weight', shape, initializer=__initializer(random), trainable=training, dtype=dtype)
-            bias = tf.get_variable('bias', [neurons], initializer=__initializer(), trainable=training, dtype=dtype)
+            weight = tf.get_variable('weight', shape, initializer=__initializer(random), trainable=training, dtype=data_type)
+            bias = tf.get_variable('bias', [neurons], initializer=__initializer(), trainable=training, dtype=data_type)
             fc = tf.nn.bias_add(tf.matmul(value, weight), bias)
             act = None if linear else tf.nn.relu(fc)
 
@@ -234,20 +224,23 @@ def density(name, neurons, linear=None, random=None, training=None, dtype=None):
 
 
 # todo
-def inception(name, *graph, training=True):
+def inception(name, *graph, training=None):
+    
     assert graph
     assert all(isinstance(x, list) for x in graph)
     assert all(all(isinstance(x, tuple) and len(x) in (2, 3) for x in pipeline) for pipeline in graph)
 
-    node_types = ('pool_proj', 'conv_1x1', 'conv_3x3', 'conv_5x5', 'conv_1x7', 'conv_7x1')
+    node_types = ('pool_3x3', 'conv_1x1', 'conv_3x3', 'conv_5x5', 'conv_1x7', 'conv_7x1')
 
-    params = _Scope.default_param(inception)
+    scope_args = _Scope.default_param(inception, as_dict=True)
+    icp_args = {'padding': 'same', 'random': 'xavier'}
+    icp_args.update(scope_args)
+    if training is not None:
+        icp_args['training'] = training
 
     def __(value):
 
         with tf.variable_scope(name):
-
-            default_args = {'padding': 'same', 'random': 'xavier', 'training': training}
 
             types1 = reduce(lambda _nn, _branch: _nn + reduce(lambda _n, _node: _n + list(_node[0:1]), _branch, []), graph, [])
             types1 = set(map(lambda _key: _key if types1.count(_key) == 1 else None, node_types))
@@ -260,11 +253,18 @@ def inception(name, *graph, training=True):
                 node, path, is_b1 = value, [], len(branch) == 1
 
                 for x in branch:
+
                     node_type, node_depth = x[0:2]
                     assert node_type in node_types
 
-                    node_args = default_args if len(x) <= 2 else x[2]
-                    node_args['training'] = training
+                    spec_args = {} if len(x) <= 2 else x[2]
+                    def_args = _Scope.default_param(getattr(inception, node_type), as_dict=True)
+
+                    node_args = copy.deepcopy(icp_args)
+                    node_args.update(def_args)
+                    node_args.update(spec_args)
+
+                    __ = _Scope.default_param(getattr(inception, node_type))
 
                     node_alias = node_args['name'] if 'name' in node_args else None
                     if not node_alias:
@@ -305,46 +305,56 @@ __attach_attr(inception, **{
             'conv_7x1' if not alias else alias, [7, 1, depth], **args)(value),
     'pool_3x3':
         lambda args, alias, depth, value: convolution(
-            'pool_proj' if not alias else alias, [1, 1, depth], **args)(pooling(
-            'pool_3x3' if not alias else alias+'_'+'pool_3x3', [3, 3], 'MAX', padding='SAME')(value)),
+            'pool_proj' if not alias else alias+'_proj', [1, 1, depth], **args)(pooling(
+            'pool_3x3' if not alias else alias, [3, 3], 'MAX', padding='SAME')(value)),
 })
 
 
-def dropout(name, **args):
+def dropout(name, noise_shape=None):
+
+    _ = _Scope.default_param(dropout)
+    noise_shape = _(noise_shape, noise_shape=None)
+
     def __(value):
         with tf.name_scope(name):
             keep_prob = tf.placeholder(tf.float32, name='keep_prob')
-            drop = tf.nn.dropout(value, name='dropout', keep_prob=keep_prob, **args)
+            drop = tf.nn.dropout(value, name='dropout', keep_prob=keep_prob, noise_shape=noise_shape)
 
             __attach_vars(drop, keep_prob=keep_prob)
             return __attach_attr(drop, naming=name)
     return __
 
 
-def normalization(name, mode=None, training=None, dtype=None,
-                  batch_scale=False, batch_shift=True, batch_epsilon=0.001, batch_decay=.999,
-                  local_depth=5, local_bias=1., local_alpha=1., local_beta=.5):
+def normalization(name, mode=None, training=None, data_type=None,
+                  batch_scale=None, batch_shift=None, batch_epsilon=None, batch_decay=None,
+                  local_depth=None, local_bias=None, local_alpha=None, local_beta=None):
 
-    params = _Scope.default_param(normalization)
-    mode = params.take(mode, mode='BATCH')
-    training = params.take(training, training=True)
-    dtype = params.take(dtype, dtype=tf.float32)
+    __ = _Scope.default_param(normalization)
+    mode = __(mode, mode='BATCH')
+    training = __(training, training=True)
+    data_type = __(data_type, data_type=tf.float32)
 
     __assert_value(mode.upper(), 'LOCAL', 'BATCH')
 
     def local_resp_norm(value):
 
-        local_alpha = params.take(local_depth, local_depth='BATCH')
+        depth = __(local_depth, local_depth=5)
+        bias = __(local_bias, local_bias=1.)
+        alpha = __(local_alpha, local_alpha=1.)
+        beta = __(local_beta, local_beta=.5)
 
         with tf.name_scope(name):
             norm = tf.nn.local_response_normalization(
-                value, name='local_resp_norm',
-                depth_radius=local_depth, bias=local_bias, alpha=local_alpha, beta=local_beta)
+                value, name='local_resp_norm', depth_radius=depth, bias=bias, alpha=alpha, beta=beta)
 
             __attach_ops(norm, norm=norm)
             return __attach_attr(norm, naming=name)
 
     def batch_norm(value):
+        scaling = __(batch_scale, batch_scale=False)
+        shifting = __(batch_shift, batch_shift=True)
+        epsilon = __(batch_epsilon, batch_epsilon=0.001)
+        decay = __(batch_decay, batch_decay=.999)
 
         with tf.variable_scope(name):
             __assert_shape(value.get_shape(), 2, 4)  # density or conv2d
@@ -355,19 +365,19 @@ def normalization(name, mode=None, training=None, dtype=None,
             if len(shape) == 2:
                 value = tf.reshape(value, [-1, 1, 1, channel], 'flatten')
 
-            scale = tf.get_variable('gamma', channel, initializer=tf.ones_initializer(), trainable=training and batch_scale, dtype=dtype)
-            shift = tf.get_variable('beta', channel, initializer=tf.zeros_initializer(), trainable=training and batch_shift, dtype=dtype)
+            scale = tf.get_variable('gamma', channel, initializer=tf.ones_initializer(), trainable=training and scaling, dtype=data_type)
+            shift = tf.get_variable('beta', channel, initializer=tf.zeros_initializer(), trainable=training and shifting, dtype=data_type)
 
             norm, mean, variance = tf.nn.fused_batch_norm(
-                value, name='batch_norm', scale=scale, offset=shift, epsilon=batch_epsilon, is_training=training)
+                value, name='batch_norm', scale=scale, offset=shift, epsilon=epsilon, is_training=training)
 
             if not training:
-                ema_mean = tf.get_variable('mean', channel, initializer=tf.zeros_initializer(), trainable=False, dtype=dtype)
-                ema_variance = tf.get_variable('variance', channel, initializer=tf.ones_initializer(), trainable=False, dtype=dtype)
+                ema_mean = tf.get_variable('mean', channel, initializer=tf.zeros_initializer(), trainable=False, dtype=data_type)
+                ema_variance = tf.get_variable('variance', channel, initializer=tf.ones_initializer(), trainable=False, dtype=data_type)
 
                 from tensorflow.python.training import moving_averages as ema
-                update_mean = ema.assign_moving_average(ema_mean, mean, decay=batch_decay)
-                update_variance = ema.assign_moving_average(ema_variance, variance, decay=batch_decay)
+                update_mean = ema.assign_moving_average(ema_mean, mean, decay=decay)
+                update_variance = ema.assign_moving_average(ema_variance, variance, decay=decay)
                 with tf.control_dependencies([update_mean, update_variance]):
                     norm = tf.identity(norm)
 
@@ -386,6 +396,8 @@ def default(layers, **params):
 
     if inspect.isfunction(layers):
         layers = [layers]
+    elif layers == sys.modules[__name__]:
+        layers = [*_Scope.scope_funcs.values()]
 
     assert __assert_type(layers, list, tuple)
     assert all(inspect.isfunction(x) for x in layers)
@@ -410,20 +422,31 @@ class _Scope(object):
         return default_params
 
     @staticmethod
-    def default_param(layer):
+    def default_param(layer, as_dict=False):
         assert inspect.isfunction(layer)
+
         assert layer in _Scope.scope_funcs.values() or hasattr(inception, layer.__name__)
 
         parent_scope = None if not _Scope.scope_stack else _Scope.scope_stack[-1]
         parent_ctx = {} if not parent_scope else parent_scope.params_ctx
 
-        merged_param = _Dict()
-        if inception in parent_ctx and hasattr(inception, layer.__name__):
-            merged_param.update(parent_ctx[inception])
+        merged_param = {}
         if layer in parent_ctx:
             merged_param.update(parent_ctx[layer])
 
-        return merged_param
+        if as_dict:
+            return merged_param
+
+        def __(spec_val, **def_val):
+
+            if spec_val is not None:
+                return spec_val
+
+            assert len(def_val) == 1
+            item, = def_val.items()
+            return merged_param.get(*item)
+
+        return __
 
     def __init__(self, layers, params):
         self.params_ctx = None
@@ -447,12 +470,4 @@ class _Scope(object):
     def __exit__(self, exc_type, exc_val, exc_tb):
         _Scope.scope_stack.pop()
 
-
-
-
-with default(convolution, padding='VALID'):
-    print(_Scope.default_param(convolution))
-    with default(convolution, stride=1):
-        print(_Scope.default_param(convolution, {'padding': 'SAME'}))
-    print(_Scope.default_param(convolution, {}))
 

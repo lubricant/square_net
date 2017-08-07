@@ -7,10 +7,12 @@ class HCCR_GoogLeNet(object):
 
     def __init__(self, is_training=True):
         with tf.variable_scope('HCCR-GoogLeNet'):
-            self.__build_network(is_training)
+            with layer.default(layer, training=is_training):
+                self.__build_network()
+
         self.__build_summary()
 
-    def __build_network(self, training):
+    def __build_network(self):
 
         FLAGS = tf.app.flags.FLAGS
 
@@ -18,50 +20,55 @@ class HCCR_GoogLeNet(object):
         self.images = layer.data('Input', [None, 120, 120, FLAGS.image_channel])
         self.labels = layer.data('Label', [None], tf.int64)
 
-        self.conv1 = layer.convolution('Conv_7x7x64', [7, 7, 64], 2, random='gauss:0.015')(self.images)
-        self.pool1 = layer.pooling('MaxPool_3x3', [3, 3], 'MAX', stride=2)(self.conv1)
-        self.norm1 = layer.normalization('LRN_1', 'LOCAL', local_alpha=0.0001, local_beta=0.75)(self.pool1)
+        with layer.default([layer.normalization], mode='LOCAL', local_alpha=0.0001, local_beta=0.75),\
+             layer.default([layer.pooling], mode='MAX', stride=2):
 
-        self.conv2 = layer.convolution('Conv_1x1x64', [1, 1, 64])(self.norm1)
-        self.conv3 = layer.convolution('Conv_3x3x192', [3, 3, 192], padding='SAME')(self.conv2)
-        self.norm2 = layer.normalization('LRN_2', 'LOCAL', local_alpha=0.0001, local_beta=0.75)(self.conv3)
-        self.pool2 = layer.pooling('MaxPool_3x3', [3, 3], 'MAX', stride=2)(self.norm2)
+            self.conv1 = layer.convolution('Conv_7x7x64', [7, 7, 64], stride=2)(self.images)
+            self.pool1 = layer.pooling('MaxPool_3x3', [3, 3])(self.conv1)
+            self.norm1 = layer.normalization('LRN_1')(self.pool1)
 
-        self.incp1 = layer.inception('Inception_v1_1',
-                                     [('pool_3x3', 32)],
-                                     [('conv_1x1', 64)],
-                                     [('conv_1x1', 96), ('conv_3x3', 128, {'random': 'gauss:0.04', 'padding': 'SAME'})],
-                                     [('conv_1x1', 16), ('conv_5x5', 32, {'random': 'gauss:0.08', 'padding': 'SAME'})])(
-                                     self.pool2)
+            self.conv2 = layer.convolution('Conv_1x1x64', [1, 1, 64])(self.norm1)
+            self.conv3 = layer.convolution('Conv_3x3x192', [3, 3, 192], padding='SAME')(self.conv2)
+            self.norm2 = layer.normalization('LRN_2')(self.conv3)
+            self.pool2 = layer.pooling('MaxPool_3x3', [3, 3])(self.norm2)
 
-        self.incp2 = layer.inception('Inception_v1_2',
-                                     [('pool_3x3', 64)],
-                                     [('conv_1x1', 128)],
-                                     [('conv_1x1', 128), ('conv_3x3', 192, {'random': 'gauss:0.04', 'padding': 'SAME'})],
-                                     [('conv_1x1', 32), ('conv_5x5', 96, {'random': 'gauss:0.08', 'padding': 'SAME'})])(
-                                    self.incp1)
+        with layer.default([layer.inception.conv_3x3], random='gauss:0.04', padding='same'),\
+             layer.default([layer.inception.conv_5x5], random='gauss:0.08', padding='same'):
 
-        self.pool3 = layer.pooling('MaxPool_3x3', [3, 3], 'MAX', stride=2)(self.incp2)
+            self.incp1 = layer.inception('Inception_v1_1',
+                                         [('pool_3x3', 32)],
+                                         [('conv_1x1', 64)],
+                                         [('conv_1x1', 96), ('conv_3x3', 128)],
+                                         [('conv_1x1', 16), ('conv_5x5', 32)])(self.pool2)
 
-        self.incp3 = layer.inception('Inception_v1_3',
-                                     [('pool_3x3', 64)],
-                                     [('conv_1x1', 160)],
-                                     [('conv_1x1', 112), ('conv_3x3', 224, {'random': 'gauss:0.04', 'padding': 'SAME'})],
-                                     [('conv_1x1', 24), ('conv_5x5', 64, {'random': 'gauss:0.08', 'padding': 'SAME'})])(
-                                     self.pool3)
+            self.incp2 = layer.inception('Inception_v1_2',
+                                         [('pool_3x3', 64)],
+                                         [('conv_1x1', 128)],
+                                         [('conv_1x1', 128), ('conv_3x3', 192)],
+                                         [('conv_1x1', 32), ('conv_5x5', 96)])(
+                                        self.incp1)
 
-        self.incp4 = layer.inception('Inception_v1_4',
-                                     [('pool_3x3', 128)],
-                                     [('conv_1x1', 256)],
-                                     [('conv_1x1', 160), ('conv_3x3', 320, {'random': 'gauss:0.04', 'padding': 'SAME'})],
-                                     [('conv_1x1', 32), ('conv_5x5', 128, {'random': 'gauss:0.08', 'padding': 'SAME'})])(
-                                     self.incp3)
+            self.pool3 = layer.pooling('MaxPool_3x3', [3, 3], stride=2)(self.incp2)
+
+            self.incp3 = layer.inception('Inception_v1_3',
+                                         [('pool_3x3', 64)],
+                                         [('conv_1x1', 160)],
+                                         [('conv_1x1', 112), ('conv_3x3', 224)],
+                                         [('conv_1x1', 24), ('conv_5x5', 64)])(
+                                         self.pool3)
+
+            self.incp4 = layer.inception('Inception_v1_4',
+                                         [('pool_3x3', 128)],
+                                         [('conv_1x1', 256)],
+                                         [('conv_1x1', 160), ('conv_3x3', 320)],
+                                         [('conv_1x1', 32), ('conv_5x5', 128)])(
+                                         self.incp3)
 
         self.pool4 = layer.pooling('AvgPool_5x5', [5, 5], 'AVG', stride=3)(self.incp4)
         self.conv4 = layer.convolution('Conv_1x1x128', [1, 1, 128])(self.pool4)
 
         self.fc = layer.density('FC_1024', 1024)(self.conv4)
-        self.dropout = layer.dropout('Dropout_FC_1024')(self.fc)
+        self.dropout = layer.dropout('Dropout')(self.fc)
         self.keep_prob = self.dropout.vars.keep_prob
 
         assert FLAGS.label_num == 3755
@@ -114,3 +121,6 @@ class HCCR_GoogLeNet(object):
 
         with tf.name_scope('FullyConnected'):
             show_weight_and_bias(self.fc, self.logits)
+
+
+HCCR_GoogLeNet()
