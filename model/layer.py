@@ -157,7 +157,6 @@ def pooling(name, p_shape, mode=None, stride=None, padding=None, training=None, 
     __ = _Scope.default_param(pooling)
     mode = __(mode, mode='MAX')
     stride = __(stride, stride=1)
-    stride = __(stride, stride=1)
     padding = __(padding, padding='valid')
     training = __(training, training=True)
     data_type = __(data_type, data_type=tf.float32)
@@ -223,18 +222,16 @@ def density(name, neurons, linear=None, random=None, training=None, data_type=No
     return __
 
 
-# todo
 def inception(name, *graph, training=None):
-    
+
     assert graph
     assert all(isinstance(x, list) for x in graph)
     assert all(all(isinstance(x, tuple) and len(x) in (2, 3) for x in pipeline) for pipeline in graph)
 
     node_types = ('pool_3x3', 'conv_1x1', 'conv_3x3', 'conv_5x5', 'conv_1x7', 'conv_7x1')
 
-    scope_args = _Scope.default_param(inception, as_dict=True)
-    icp_args = {'padding': 'same', 'random': 'xavier'}
-    icp_args.update(scope_args)
+    icp_args = _Scope.default_param(inception, as_dict=True)
+    icp_args.update({'padding': 'same'})
     if training is not None:
         icp_args['training'] = training
 
@@ -258,13 +255,11 @@ def inception(name, *graph, training=None):
                     assert node_type in node_types
 
                     spec_args = {} if len(x) <= 2 else x[2]
-                    def_args = _Scope.default_param(getattr(inception, node_type), as_dict=True)
+                    scope_args = _Scope.default_param(getattr(inception, node_type), as_dict=True)
 
                     node_args = copy.deepcopy(icp_args)
-                    node_args.update(def_args)
+                    node_args.update(scope_args)
                     node_args.update(spec_args)
-
-                    __ = _Scope.default_param(getattr(inception, node_type))
 
                     node_alias = node_args['name'] if 'name' in node_args else None
                     if not node_alias:
@@ -425,7 +420,7 @@ class _Scope(object):
     def default_param(layer, as_dict=False):
         assert inspect.isfunction(layer)
 
-        assert layer in _Scope.scope_funcs.values() or hasattr(inception, layer.__name__)
+        assert layer in _Scope.scope_funcs.values() or layer in vars(inception).values()
 
         parent_scope = None if not _Scope.scope_stack else _Scope.scope_stack[-1]
         parent_ctx = {} if not parent_scope else parent_scope.params_ctx
@@ -469,5 +464,3 @@ class _Scope(object):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         _Scope.scope_stack.pop()
-
-

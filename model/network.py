@@ -122,5 +122,3 @@ class HCCR_GoogLeNet(object):
         with tf.name_scope('FullyConnected'):
             show_weight_and_bias(self.fc, self.logits)
 
-
-HCCR_GoogLeNet()
