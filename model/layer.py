@@ -80,7 +80,7 @@ def __initializer(mode=None):
         stddev = gauss_with_opt.findall(mode)
         stddev = None if not stddev else float(stddev[0])
         if stddev:  # normal with 0 mean and specific stddev
-            return init_ops.truncated_normal_initializer(stddev=stddev)
+            return tf.random_normal_initializer(stddev=stddev)
         else:  # np.random.randn(n) / sqrt(fan_in) [tanH]
             return init_ops.variance_scaling_initializer(scale=1)
 

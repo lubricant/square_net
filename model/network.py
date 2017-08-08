@@ -17,18 +17,20 @@ class HCCR_GoogLeNet(object):
         FLAGS = tf.app.flags.FLAGS
 
         assert FLAGS.image_size <= 120
+        assert FLAGS.label_num == 3755
+
         self.images = layer.data('Input', [None, 120, 120, FLAGS.image_channel])
         self.labels = layer.data('Label', [None], tf.int64)
 
         with layer.default([layer.normalization], mode='LOCAL', local_alpha=0.0001, local_beta=0.75),\
              layer.default([layer.pooling], mode='MAX', stride=2):
 
-            self.conv1 = layer.convolution('Conv_7x7x64', [7, 7, 64], stride=2)(self.images)
+            self.conv1 = layer.convolution('Conv_7x7x64', [7, 7, 64], stride=2, random='gauss:0.015')(self.images)
             self.pool1 = layer.pooling('MaxPool_3x3', [3, 3])(self.conv1)
             self.norm1 = layer.normalization('LRN_1')(self.pool1)
 
             self.conv2 = layer.convolution('Conv_1x1x64', [1, 1, 64])(self.norm1)
-            self.conv3 = layer.convolution('Conv_3x3x192', [3, 3, 192], padding='SAME')(self.conv2)
+            self.conv3 = layer.convolution('Conv_3x3x192', [3, 3, 192], padding='SAME', random='gauss:0.02')(self.conv2)
             self.norm2 = layer.normalization('LRN_2')(self.conv3)
             self.pool2 = layer.pooling('MaxPool_3x3', [3, 3])(self.norm2)
 
@@ -67,12 +69,11 @@ class HCCR_GoogLeNet(object):
         self.pool4 = layer.pooling('AvgPool_5x5', [5, 5], 'AVG', stride=3)(self.incp4)
         self.conv4 = layer.convolution('Conv_1x1x128', [1, 1, 128])(self.pool4)
 
-        self.fc = layer.density('FC_1024', 1024)(self.conv4)
-        self.dropout = layer.dropout('Dropout')(self.fc)
-        self.keep_prob = self.dropout.vars.keep_prob
-
-        assert FLAGS.label_num == 3755
-        self.logits = layer.density('FC_3755', 3755, linear=True)(self.dropout)
+        with layer.default([layer.density], random='gauss:0.01'):
+            self.fc = layer.density('FC_1024', 1024)(self.conv4)
+            self.dropout = layer.dropout('Dropout')(self.fc)
+            self.logits = layer.density('FC_3755', 3755, linear=True)(self.dropout)
+            self.keep_prob = self.dropout.vars.keep_prob
 
         self.loss = layer.loss('Loss')(self.logits, self.labels)
 
@@ -127,4 +128,3 @@ class HCCR_GoogLeNet(object):
 
         with tf.name_scope('FullyConnected'):
             show_weight_and_bias(self.fc, self.logits)
-
