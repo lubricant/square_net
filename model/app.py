@@ -125,6 +125,7 @@ def evaluating_routine(network, queue_op):
         (TP, FP, FN) = 0, 1, 2
         confuse_mat = np.zeros([3, data.NUM_CLASSES])
 
+        samples_num = 0
         total_correct, total_error = 0, 0
 
         logging.info('Test procedure is ready')
@@ -138,15 +139,17 @@ def evaluating_routine(network, queue_op):
                 inference = np.argmax(logits, axis=-1)
                 assert labels.shape == inference.shape
 
-                for correct in np.where(labels == inference):
+                for correct in np.where(labels == inference)[0]:
                     confuse_mat[TP][labels[correct]] += 1
                     total_correct += 1
 
-                for error in np.where(labels != inference):
+                for error in np.where(labels != inference)[0]:
                     pos, neg = labels[error], inference[error]
                     confuse_mat[FP][neg] += 1
                     confuse_mat[FN][pos] += 1
                     total_error += 1
+
+                samples_num += len(labels)
 
         except tf.errors.OutOfRangeError:
             pass
@@ -155,16 +158,16 @@ def evaluating_routine(network, queue_op):
             coord.request_stop()
             coord.join(threads)
 
-        reverse_dict, = data.label_dict()
+        reverse_dict, _ = data.label_dict()
 
         with np.errstate(divide='ignore', invalid='ignore'):
             accuracy = total_correct / (total_correct + total_error)
             precision = confuse_mat[TP] / (confuse_mat[TP] + confuse_mat[FP])
             recall = confuse_mat[TP] / (confuse_mat[TP] + confuse_mat[FN])
 
-            accuracy = 0 if np.isfinite(accuracy) else accuracy
-            precision[~np.isfinite(precision)] = 0
-            recall[~np.isfinite(recall)] = 0
+        accuracy = 0 if not np.isfinite(accuracy) else accuracy
+        precision[~np.isfinite(precision)] = 0
+        recall[~np.isfinite(recall)] = 0
 
         top_N = 10
 
@@ -174,14 +177,16 @@ def evaluating_routine(network, queue_op):
         arg_precision = arg_precision[precision[arg_precision] > 0]
         arg_recall = arg_recall[recall[arg_recall] > 0]
 
-        best_precision, worst_precision = arg_precision[-top_N:], arg_precision[:top_N]
-        best_recall, worst_recall = arg_recall[-top_N:], arg_recall[:top_N]
+        best_precision, worst_precision = arg_precision[-top_N:][::-1], arg_precision[:top_N]
+        best_recall, worst_recall = arg_recall[-top_N:][::-1], arg_recall[:top_N]
 
-        def arg_fmt(arg_list):
-            '\n\t\t'.join(['%s: %f' % (reverse_dict[arg], precision[arg]) for arg in arg_list])
+        def arg_fmt(arg_list, criteria):
+            return '\n\t\t' + '\n\t\t'.join(['%s: %f' % (reverse_dict[arg], criteria[arg]) for arg in arg_list])
 
         print("""
         Test Result:
+        
+        Samples Num: {total_num}
         
         Accuracy: {accuracy}
         
@@ -193,11 +198,13 @@ def evaluating_routine(network, queue_op):
             
         Worst {N} Recall: {worst_recall}
             
-        """.format(N=top_N, accuracy=accuracy,
-                   best_precision=arg_fmt(best_precision),
-                   worst_precision=arg_fmt(worst_precision),
-                   best_recall=arg_fmt(best_recall),
-                   worst_recall=arg_fmt(worst_recall)))
+        """.format(N=top_N,
+                   total_num=samples_num,
+                   accuracy=accuracy,
+                   best_precision=arg_fmt(best_precision, precision),
+                   worst_precision=arg_fmt(worst_precision, precision),
+                   best_recall=arg_fmt(best_recall, recall),
+                   worst_recall=arg_fmt(worst_recall, recall)))
 
 
 if __name__ == '__main__':
@@ -213,7 +220,7 @@ if __name__ == '__main__':
 
         logging.info('Preparing Dir done')
 
-    net = HCCR_GoogLeNet()
+    net = HCCR_GoogLeNet(is_training=FLAGS.is_training)
     queue = data.data_queue(
         data_set=FLAGS.data_set,
         batch_size=FLAGS.batch_size,

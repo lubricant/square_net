@@ -1,75 +1,42 @@
 import inspect
 import os
-import shutil
+import glob
 
-import numpy as np
 import tensorflow as tf
 from tensorflow.python import gfile as gf
 
 import data as this
 
 PWD = os.path.abspath(os.path.join(inspect.getfile(this), os.pardir)).replace('\\', '/')
-RECORD_ROOT = 'H:/data_set'
+RECORD_ROOT = 'G:'
+TEMP_ROOT = 'G:'
 
-NUM_CLASSES = 10 + 3755
+NUM_CLASSES = 3755
 IMG_SIZE, IMG_CHANNEL = 112, 1
 (DS_TRAIN, DS_TEST, DS_ALL) = ('TRAIN', 'TEST', 'ALL')
+(TRAIN_SET_PREFIX, TEST_SET_PREFIX) = ('training_set', 'test_set')
 
 
-# def get_path(path):
-#     path = path.replace('/', os.path.sep)
-#     if not path.startswith(os.path.sep):
-#         path = os.path.sep + path
-#     return PWD + path
-#
-#
-# def get_size(path):
-#     filename = get_path(path)
-#     assert os.path.isfile(filename)
-#     return os.path.getsize(filename)
-#
-#
-# def list_file(path):
-#     filename = get_path(path)
-#     assert os.path.isdir(filename)
-#     return os.listdir(filename)
-#
-#
-# def exist_path(path):
-#     return os.path.exists(get_path(path))
-#
-#
-# def ensure_path(path):
-#     if exist_path(path):
-#         shutil.rmtree(get_path(path))
-#     os.mkdir(get_path(path))
-
-
-def label_dict(dict_path='labels_dict.npy'):
-
-    return np.load(PWD + '/' + dict_path)
+def label_dict(dict_name='labels_dict.npy'):
+    assert os.path.exists(PWD + '/blob/' + dict_name)
+    return np.load(PWD + '/blob/' + dict_name)
 
 
 def data_queue(data_set, batch_size, thread_num=1, epoch_num=None):
 
     assert batch_size > 0 and thread_num > 0
-
     data_repo = {
-        DS_TRAIN: ['F:/record/train/', 'G:/record/train/'],
-        DS_TEST: [],
-        DS_ALL: []}
+        DS_TRAIN: RECORD_ROOT + '/record/**/' + TRAIN_SET_PREFIX + '*',
+        DS_TEST: RECORD_ROOT + '/record/**/' + TEST_SET_PREFIX + '*'}
 
-    assert data_set and data_set.upper() in data_repo
+    assert data_set and data_set.upper() in (DS_TRAIN, DS_TEST, DS_ALL)
 
     with tf.name_scope('Queue'):
-        data_set_file = []
-        data_set_list = data_repo[data_set.upper()]
-
-        assert data_set_list
-        for data_set in data_set_list:
-            assert gf.Exists(data_set) and \
-                   gf.IsDirectory(data_set)
-            data_set_file += [data_set + f for f in gf.ListDirectory(data_set)]
+        if DS_ALL == data_set.upper():
+            data_set_file = glob.glob(data_repo[DS_TRAIN]) + \
+                            glob.glob(data_repo[DS_TEST])
+        else:
+            data_set_file = glob.glob(data_repo[data_set.upper()])
 
         filename_queue = tf.train.string_input_producer(
             list(filter(lambda f: os.path.isfile(f), set(data_set_file))),
@@ -82,9 +49,14 @@ def data_queue(data_set, batch_size, thread_num=1, epoch_num=None):
                 'index': tf.FixedLenFeature([], tf.int64),
                 'image': tf.FixedLenFeature([], tf.string)})
 
+        pad = (120 - IMG_SIZE) // 2
+        assert pad > 0 and (pad*2) + IMG_SIZE == 120
+        padding = [[pad, pad], [pad, pad], [0, 0]]
+
         labels = tf.cast(features['index'], tf.int32)
-        images = tf.reshape((tf.cast(tf.decode_raw(features['image'], tf.uint8), tf.float32) / 255. - .5),
-                            [IMG_SIZE, IMG_SIZE, IMG_CHANNEL])
+        images = tf.cast(tf.pad(tf.reshape(
+                    tf.decode_raw(features['image'], tf.uint8),
+                    [IMG_SIZE, IMG_SIZE, IMG_CHANNEL]), padding), tf.float32) / 255. - .5
 
         rand_data_queue = tf.train.shuffle_batch([images, labels],
                                                  batch_size=batch_size,
@@ -104,7 +76,7 @@ if __name__ == '__main__':
 
     def try_queue():
 
-        filename_queue = tf.train.string_input_producer([RECORD_ROOT + '/record/test/test_set_0.tfr'])
+        filename_queue = tf.train.string_input_producer([RECORD_ROOT + '/record/train/training_set_0.tfr'])
         _, serialized_example = tf.TFRecordReader().read(filename_queue)
         features = tf.parse_single_example(
             serialized_example,
@@ -126,7 +98,7 @@ if __name__ == '__main__':
             coord.join(threads)
 
     def try_rand_queue():
-        image_batch, label_batch = data_queue(data_set=DS_TRAIN, batch_size=100, epoch_num=1)
+        image_batch, label_batch = data_queue(data_set=DS_TEST, batch_size=100, epoch_num=1)
         init_op = tf.group(tf.initialize_all_variables(),
                            tf.initialize_local_variables())
         with tf.Session() as sess:
@@ -142,12 +114,12 @@ if __name__ == '__main__':
                 # gabor_filter = GaborFilter((100, 100))
                 # gabor_part = np.array()
 
-                # img = image[0]
-                # plt.imshow(img.reshape(img.shape[:-1]), cmap='gray')
-                # plt.show()
+                img = image[0]
+                plt.imshow(img.reshape(img.shape[:-1]), cmap='gray')
+                plt.show()
 
             coord.request_stop()
             coord.join(threads)
 
-
     try_rand_queue()
+
