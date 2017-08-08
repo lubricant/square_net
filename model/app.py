@@ -220,7 +220,7 @@ if __name__ == '__main__':
 
         logging.info('Preparing Dir done')
 
-    net = HCCR_GoogLeNet()
+    net = HCCR_GoogLeNet(is_training=FLAGS.is_training)
     queue = data.data_queue(
         data_set=FLAGS.data_set,
         batch_size=FLAGS.batch_size,
