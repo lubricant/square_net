@@ -1,3 +1,13 @@
+# Custom files and folders
+.idea/
+data/mnist/
+data/tmp/
+data/casia/
+data/tfrecord/
+data/record/
+
+*.npy
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -99,11 +109,3 @@ ENV/
 
 # mypy
 .mypy_cache/
-
-# custom
-.idea
-/data/mnist
-/data/tmp
-/data/casia
-/data/tfrecord
-/data/record
