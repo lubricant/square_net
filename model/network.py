@@ -89,7 +89,13 @@ class HCCR_GoogLeNet(object):
                     stddev = tf.sqrt(tf.reduce_mean(tf.square(val - mean)))
                     tf.summary.scalar('mean', mean)
                     tf.summary.scalar('stddev', stddev)
-                tf.summary.histogram(name, val)
+
+                    grad, = tf.gradients(self.loss, val)
+                    grad_mean = tf.reduce_mean(grad)
+                    tf.summary.scalar('grad_mean', grad_mean)
+
+                    tf.summary.histogram('hist', val)
+                    tf.summary.histogram('grad', grad)
 
         def show_weight_and_bias(*args):
             for var in args:
