@@ -85,14 +85,16 @@ class HCCR_GoogLeNet(object):
 
         def show_tensor(**args):
             for name, val in args.items():
+
                 with tf.name_scope(name):
                     mean = tf.reduce_mean(val)
                     stddev = tf.sqrt(tf.reduce_mean(tf.square(val - mean)))
+
+                    grad = tf.gradients(self.loss, val)[0]
+                    grad_mean = tf.reduce_mean(grad)
+
                     tf.summary.scalar('mean', mean)
                     tf.summary.scalar('stddev', stddev)
-
-                    grad, = tf.gradients(self.loss, val)
-                    grad_mean = tf.reduce_mean(grad)
                     tf.summary.scalar('grad_mean', grad_mean)
 
                     tf.summary.histogram('hist', val)
