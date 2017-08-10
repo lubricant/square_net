@@ -14,7 +14,8 @@ flags = tf.app.flags
 flags.DEFINE_boolean('is_training', True, 'Application execute mode.')
 flags.DEFINE_boolean('exp_decay', True, 'Applying exponential decay to the learning rate.')
 
-flags.DEFINE_float('learning_rate', 0.01, 'Initial learning rate.')
+flags.DEFINE_float('learning_rate', 0.005, 'Initial learning rate.')
+flags.DEFINE_float('final_learning_rate', 0.001, 'Final learning rate for decay.')
 flags.DEFINE_float('decay_rate', 0.9, 'Base number of exponential decay rate.')
 flags.DEFINE_float('keep_prob', 0.6, 'Keep probability for training dropout.')
 
@@ -35,7 +36,9 @@ if tf.app.flags.FLAGS.is_training:
     flags.DEFINE_string('data_set', data.DS_TRAIN, 'Application execute mode.')
     flags.DEFINE_integer('epoch_num', 3, 'Number of epochs to run trainer.')
     flags.DEFINE_integer("thread_num", 5, 'Number of thread to read data.')
-    flags.DEFINE_integer('batch_size', 425, 'Batch size of each step.')
+    flags.DEFINE_integer('batch_size', 100, 'Batch size of each step.')
+
+    flags.DEFINE_string('model_solver', 'Momentum', 'Solver to optimize the model. (SGD, Momentum, AdaDelta, Adam)')
 else:
     flags.DEFINE_string('data_set', data.DS_TEST, 'Application execute mode.')
     flags.DEFINE_integer('epoch_num', 1, 'Number of epochs to run trainer.')

@@ -22,17 +22,33 @@ def training_routine(network, queue_op):
 
     logging.info('Training procedure starting ...')
 
-    log_op = tf.summary.merge_all()
-
     step_op = tf.Variable(0, name='global_step', trainable=False)
 
     with tf.name_scope('Solver'):
-        train_op = tf.train.AdamOptimizer(
-            learning_rate=FLAGS.learning_rate if not FLAGS.exp_decay else (
-                tf.train.exponential_decay(FLAGS.learning_rate, global_step=step_op,
-                                           decay_steps=FLAGS.decay_interval,
-                                           decay_rate=FLAGS.decay_rate)
-            )).minimize(network.loss, global_step=step_op)
+
+        learn_rate = FLAGS.learning_rate
+        if FLAGS.exp_decay:
+            learn_rate_delta = FLAGS.learning_rate - FLAGS.final_learning_rate
+            learn_rate_decay = tf.train.exponential_decay(learn_rate_delta, step_op, FLAGS.decay_interval, FLAGS.decay_rate)
+            learn_rate = tf.add(learn_rate_decay, FLAGS.final_learning_rate)
+            tf.summary.scalar('learning_rate', learn_rate)
+
+        assert FLAGS.model_solver in ('SGD', 'Momentum', 'AdaDelta', 'Adam')
+
+        solver = None
+
+        if FLAGS.model_solver == 'SGD':
+            solver = tf.train.GradientDescentOptimizer(learn_rate)
+        if FLAGS.model_solver == 'Momentum':
+            solver = tf.train.MomentumOptimizer(learn_rate, momentum=0.9)
+        if FLAGS.model_solver == 'AdaDelta':
+            solver = tf.train.AdadeltaOptimizer(learn_rate)
+        if FLAGS.model_solver == 'Adam':
+            solver = tf.train.AdamOptimizer(learn_rate)
+
+        train_op = solver.minimize(network.loss, global_step=step_op)
+
+    log_op = tf.summary.merge_all()
 
     with tf.name_scope('Initializer'):
         init_op = tf.group(tf.global_variables_initializer(),
