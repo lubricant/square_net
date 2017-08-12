@@ -5,8 +5,8 @@ import tensorflow as tf
 from tensorflow.python import gfile as gf
 from tensorflow.python.client import timeline
 
-
 import data
+import model
 from model.network import HCCR_GoogLeNet
 
 
@@ -29,7 +29,8 @@ def training_routine(network, queue_op):
         learn_rate = FLAGS.learning_rate
         if FLAGS.exp_decay:
             learn_rate_delta = FLAGS.learning_rate - FLAGS.final_learning_rate
-            learn_rate_decay = tf.train.exponential_decay(learn_rate_delta, step_op, FLAGS.decay_interval, FLAGS.decay_rate)
+            learn_rate_decay = tf.train.exponential_decay(learn_rate_delta, step_op,
+                                                          FLAGS.decay_interval, FLAGS.decay_rate, staircase=True)
             learn_rate = tf.add(learn_rate_decay, FLAGS.final_learning_rate)
             tf.summary.scalar('learning_rate', learn_rate)
 
@@ -234,7 +235,15 @@ if __name__ == '__main__':
         if not gf.Exists(FLAGS.log_dir):
             gf.MakeDirs(FLAGS.log_dir)
 
-        logging.info('Preparing Dir done')
+            board_port = 2333
+            start_bat = '@ echo off\n'
+            start_bat += 'echo ' + '\necho '.join(model.setting.replace('|', ' ').splitlines()) + '\n'
+            start_bat += 'tensorboard --logdir="." --port=' + str(board_port) + '\n'
+            start_bat += 'pause'
+            start_bat_file = open(FLAGS.log_dir + '/start.bat', mode='w')
+            start_bat_file.write(start_bat)
+            start_bat_file.close()
+            logging.info('Preparing Dir done')
 
     net = HCCR_GoogLeNet(is_training=FLAGS.is_training)
     queue = data.data_queue(

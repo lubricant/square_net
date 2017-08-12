@@ -14,7 +14,7 @@ flags = tf.app.flags
 flags.DEFINE_boolean('is_training', True, 'Application execute mode.')
 flags.DEFINE_boolean('exp_decay', True, 'Applying exponential decay to the learning rate.')
 
-flags.DEFINE_float('learning_rate', 0.005, 'Initial learning rate.')
+flags.DEFINE_float('learning_rate', 0.003, 'Initial learning rate.')
 flags.DEFINE_float('final_learning_rate', 0.001, 'Final learning rate for decay.')
 flags.DEFINE_float('decay_rate', 0.9, 'Base number of exponential decay rate.')
 flags.DEFINE_float('keep_prob', 0.6, 'Keep probability for training dropout.')
@@ -24,8 +24,8 @@ flags.DEFINE_integer('image_size', data.IMG_SIZE, 'Size of image.')
 flags.DEFINE_integer('image_channel', data.IMG_CHANNEL, 'Channel of image.')
 
 flags.DEFINE_integer('decay_interval', 5000, 'Number of step between each exponential decay.')
-flags.DEFINE_integer("log_interval", 150, 'Number of step between each logging.')
-flags.DEFINE_integer("checkpoint_interval", 3000, 'Number of step between each checkpoint.')
+flags.DEFINE_integer("log_interval", 300, 'Number of step between each logging.')
+flags.DEFINE_integer("checkpoint_interval", 6000, 'Number of step between each checkpoint.')
 
 flags.DEFINE_string('log_dir', data.TEMP_ROOT + '/tmp/summary', 'Summaries directory.')
 flags.DEFINE_string('checkpoint_dir', data.TEMP_ROOT + '/tmp/checkpoint', 'Checkpoint directory.')
@@ -34,11 +34,11 @@ flags.DEFINE_string('trace_file', data.TEMP_ROOT + '/tmp/trace.ctf.json', 'Chrom
 
 if tf.app.flags.FLAGS.is_training:
     flags.DEFINE_string('data_set', data.DS_TRAIN, 'Application execute mode.')
-    flags.DEFINE_integer('epoch_num', 3, 'Number of epochs to run trainer.')
+    flags.DEFINE_integer('epoch_num', 10, 'Number of epochs to run trainer.')
     flags.DEFINE_integer("thread_num", 5, 'Number of thread to read data.')
-    flags.DEFINE_integer('batch_size', 100, 'Batch size of each step.')
+    flags.DEFINE_integer('batch_size', 50, 'Batch size of each step.')
 
-    flags.DEFINE_string('model_solver', 'Momentum', 'Solver to optimize the model. (SGD, Momentum, AdaDelta, Adam)')
+    flags.DEFINE_string('model_solver', 'Adam', 'Solver name, like: SGD, Momentum, AdaDelta, Adam')
 else:
     flags.DEFINE_string('data_set', data.DS_TEST, 'Application execute mode.')
     flags.DEFINE_integer('epoch_num', 1, 'Number of epochs to run trainer.')
@@ -77,14 +77,20 @@ flags_detail = {bool: [], int: [], float: [], str: []}
 device_info = ['%- 20s: %- 10s %+ 20s MB' % (
     x.name, x.device_type, x.memory_limit//1024//1024) for x in device_lib.list_local_devices()]
 
-print('-'*75)
-print('|\t' + '\n|\t'.join(flags_detail[bool]))
-print('-'*75)
-print('|\t' + '\n|\t'.join(flags_detail[str]))
-print('-'*75)
-print('|\t' + '\n|\t'.join(flags_detail[int]))
-print('-'*75)
-print('|\t' + '\n|\t'.join(flags_detail[float]))
-print('-'*75)
-print('|\t' + '\n|\t'.join(device_info))
-print('-'*75)
+setting = ''
+setting += '-'*75 + '\n'
+setting += ('|\t' + '\n|\t'.join(flags_detail[bool])) + '\n'
+setting += '-'*75 + '\n'
+setting += ('|\t' + '\n|\t'.join(flags_detail[str])) + '\n'
+setting += '-'*75 + '\n'
+setting += ('|\t' + '\n|\t'.join(flags_detail[int])) + '\n'
+setting += '-'*75 + '\n'
+setting += ('|\t' + '\n|\t'.join(flags_detail[float])) + '\n'
+setting += '-'*75 + '\n'
+
+setting_and_device = setting + ('|\t' + '\n|\t'.join(device_info)) + '\n'
+setting_and_device += '-'*75 + '\n'
+
+print(setting_and_device)
+
+
