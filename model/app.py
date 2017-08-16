@@ -79,12 +79,18 @@ def training_routine(network, queue_op):
             while not coord.should_stop():
 
                 images, labels = sess.run(queue_op)
+
+                mean, stddev = np.mean(images), np.std(images)
+                images -= mean
+                images /= stddev
+                np.mean(images), np.std(images)
+
                 feed_dict = {network.images: images,
                              network.labels: labels,
                              network.keep_prob: FLAGS.keep_prob}
 
                 step = sess.run(step_op) + 1
-                if step % FLAGS.log_interval:
+                if step > 1 and step % FLAGS.log_interval:
                     sess.run(train_op, feed_dict)
                 else:
 
@@ -235,12 +241,12 @@ if __name__ == '__main__':
         if not gf.Exists(FLAGS.log_dir):
             gf.MakeDirs(FLAGS.log_dir)
 
-            board_port = 2333
+            board_port = 2223
             start_bat = '@ echo off\n'
             start_bat += 'echo ' + '\necho '.join(model.setting.replace('|', ' ').splitlines()) + '\n'
             start_bat += 'tensorboard --logdir="." --port=' + str(board_port) + '\n'
             start_bat += 'pause'
-            start_bat_file = open(FLAGS.log_dir + '/start.bat', mode='w')
+            start_bat_file = open(data.TEMP_ROOT + '/tmp/start.bat', mode='w')
             start_bat_file.write(start_bat)
             start_bat_file.close()
             logging.info('Preparing Dir done')
