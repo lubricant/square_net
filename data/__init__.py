@@ -56,7 +56,7 @@ def data_queue(data_set, batch_size, thread_num=1, epoch_num=None):
         labels = tf.cast(features['index'], tf.int32)
         images = tf.cast(tf.pad(tf.reshape(
                     tf.decode_raw(features['image'], tf.uint8),
-                    [IMG_SIZE, IMG_SIZE, IMG_CHANNEL]), padding), tf.float32) / 255. - .5
+                    [IMG_SIZE, IMG_SIZE, IMG_CHANNEL]), padding), tf.float32)
 
         rand_data_queue = tf.train.shuffle_batch([images, labels],
                                                  batch_size=batch_size,
@@ -71,6 +71,8 @@ if __name__ == '__main__':
     from matplotlib import pyplot as plt
     from data.cv_filter import *
     from data.dt_trans import *
+
+    np.set_printoptions(threshold=np.NaN, linewidth=np.NaN)
 
     ch_dict, _ = label_dict()
 
@@ -114,9 +116,16 @@ if __name__ == '__main__':
                 # gabor_filter = GaborFilter((100, 100))
                 # gabor_part = np.array()
 
-                img = image[0]
+                img, idx = image[0], label[0]
+                mean, stddev = np.mean(img), np.std(img)
+                img -= mean
+                img /= stddev
+                print(ch_dict[idx], np.mean(img), np.std(img))
+                # print(img.reshape((120, 120)))
+
                 plt.imshow(img.reshape(img.shape[:-1]), cmap='gray')
                 plt.show()
+                return
 
             coord.request_stop()
             coord.join(threads)
