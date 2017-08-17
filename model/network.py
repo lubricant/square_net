@@ -71,10 +71,14 @@ class HCCR_GoogLeNet(object):
             self.conv4 = layer.convolution('Conv_1x1x128', [1, 1, 128], random='caffe')(self.pool4)
 
         with layer.default([layer.density], random='gauss:0.01'):
+            # self.fc = layer.density('FC_1024', 1024)(self.conv4)
+            # self.dropout = layer.dropout('Dropout')(self.fc)
+            # self.logits = layer.density('FC_3755', 3755, linear=True)(self.dropout)
+            # self.keep_prob = self.dropout.vars.keep_prob
+
             self.fc = layer.density('FC_1024', 1024)(self.conv4)
-            self.dropout = layer.dropout('Dropout')(self.fc)
-            self.logits = layer.density('FC_3755', 3755, linear=True)(self.dropout)
-            self.keep_prob = self.dropout.vars.keep_prob
+            self.logits = layer.density('FC_3755', 3755, linear=True)(self.fc)
+            self.keep_prob = tf.placeholder(tf.float32)
 
         self.loss = layer.loss('Loss')(self.logits, self.labels)
 

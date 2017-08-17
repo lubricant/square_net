@@ -51,11 +51,17 @@ def training_routine(network, queue_op):
 
     log_op = tf.summary.merge_all()
 
+    with tf.name_scope('Probe'):
+        g = tf.gradients(network.loss, [network.conv1, network.conv2])
+        g_w1 = tf.gradients(network.conv1, [network.conv1.vars.weight]) + tf.gradients(network.loss, [network.conv1.vars.weight])
+        g_w2 = tf.gradients(network.conv2, [network.conv2.vars.weight]) + tf.gradients(network.loss, [network.conv2.vars.weight])
+        probe_op = g + g_w1 + g_w2
+
     with tf.name_scope('Initializer'):
         init_op = tf.group(tf.global_variables_initializer(),
                            tf.local_variables_initializer())
 
-    with tf.Session(config=config) as sess, open(FLAGS.trace_file, 'w') as tracer:
+    with tf.Session(config=config) as sess:
         sess.run(init_op)
 
         saver = tf.train.Saver(name='Saver')
@@ -89,22 +95,28 @@ def training_routine(network, queue_op):
                              network.labels: labels,
                              network.keep_prob: FLAGS.keep_prob}
 
-                step = sess.run(step_op) + 1
-                if step > 1 and step % FLAGS.log_interval:
-                    sess.run(train_op, feed_dict)
-                else:
+                step, _ = sess.run([step_op, train_op], feed_dict)
+
+                if not step % FLAGS.log_interval or step == 1:
 
                     run_meta = tf.RunMetadata()
                     run_opt = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
 
-                    summary, _ = sess.run([log_op, train_op], feed_dict, options=run_opt, run_metadata=run_meta)
+                    summary, probe = sess.run([log_op, probe_op], feed_dict, options=run_opt, run_metadata=run_meta)
+
                     writer.add_run_metadata(run_meta, 'step%03d' % step)
                     writer.add_summary(summary, global_step=step)
 
-                    stats = timeline.Timeline(step_stats=run_meta.step_stats)
-                    tracer.write(stats.generate_chrome_trace_format())
-
+                    gc1, gc2, gw1_co, gw1_lo, gw2_co, gw2_lo = probe
                     logging.info('Report step: {}'.format(step))
+                    print('-' * 150)
+                    print('loss/conv1\t zeros: {}%\t mean: {}\t '.format(round(np.sum(gc1 <= 0)/np.prod(gc1.shape), 4)*100, np.mean(gc1)))
+                    print('loss/conv2\t zeros: {}%\t mean: {}\t '.format(round(np.sum(gc2 <= 0)/np.prod(gc2.shape), 4)*100, np.mean(gc2)))
+                    print('conv/weight1\t mean: {}\t\t min: {}\t\t max: {}\t\t'.format(np.mean(gw1_co), np.min(gw1_co), np.max(gw1_co)))
+                    print('loss/weight1\t mean: {}\t\t min: {}\t\t max: {}\t\t'.format(np.mean(gw1_lo), np.min(gw1_lo), np.max(gw1_lo)))
+                    print('conv/weight2\t mean: {}\t\t min: {}\t\t max: {}\t\t'.format(np.mean(gw2_co), np.min(gw2_co), np.max(gw2_co)))
+                    print('loss/weight2\t mean: {}\t\t min: {}\t\t max: {}\t\t'.format(np.mean(gw2_lo), np.min(gw2_lo), np.max(gw2_lo)))
+                    print('-' * 150)
 
                 if not step % FLAGS.checkpoint_interval:
                     logging.info('Saving checkpoint {} ...'.format(step//FLAGS.checkpoint_interval))
