@@ -52,10 +52,11 @@ def training_routine(network, queue_op):
     log_op = tf.summary.merge_all()
 
     with tf.name_scope('Probe'):
-        g = tf.gradients(network.loss, [network.conv1, network.conv2])
+        c = [network.conv1, network.conv2]
         g_w1 = tf.gradients(network.conv1, [network.conv1.vars.weight]) + tf.gradients(network.loss, [network.conv1.vars.weight])
         g_w2 = tf.gradients(network.conv2, [network.conv2.vars.weight]) + tf.gradients(network.loss, [network.conv2.vars.weight])
-        probe_op = g + g_w1 + g_w2
+        f = [network.fc, network.logits]
+        probe_op = c + g_w1 + g_w2 + f
 
     with tf.name_scope('Initializer'):
         init_op = tf.group(tf.global_variables_initializer(),
@@ -89,7 +90,6 @@ def training_routine(network, queue_op):
                 mean, stddev = np.mean(images), np.std(images)
                 images -= mean
                 images /= stddev
-                np.mean(images), np.std(images)
 
                 feed_dict = {network.images: images,
                              network.labels: labels,
@@ -107,15 +107,17 @@ def training_routine(network, queue_op):
                     writer.add_run_metadata(run_meta, 'step%03d' % step)
                     writer.add_summary(summary, global_step=step)
 
-                    gc1, gc2, gw1_co, gw1_lo, gw2_co, gw2_lo = probe
+                    c1, c2, gw1_co, gw1_lo, gw2_co, gw2_lo, f1, f2 = probe
                     logging.info('Report step: {}'.format(step))
                     print('-' * 150)
-                    print('loss/conv1\t zeros: {}%\t mean: {}\t '.format(round(np.sum(gc1 <= 0)/np.prod(gc1.shape), 4)*100, np.mean(gc1)))
-                    print('loss/conv2\t zeros: {}%\t mean: {}\t '.format(round(np.sum(gc2 <= 0)/np.prod(gc2.shape), 4)*100, np.mean(gc2)))
-                    print('conv/weight1\t mean: {}\t\t min: {}\t\t max: {}\t\t'.format(np.mean(gw1_co), np.min(gw1_co), np.max(gw1_co)))
-                    print('loss/weight1\t mean: {}\t\t min: {}\t\t max: {}\t\t'.format(np.mean(gw1_lo), np.min(gw1_lo), np.max(gw1_lo)))
-                    print('conv/weight2\t mean: {}\t\t min: {}\t\t max: {}\t\t'.format(np.mean(gw2_co), np.min(gw2_co), np.max(gw2_co)))
-                    print('loss/weight2\t mean: {}\t\t min: {}\t\t max: {}\t\t'.format(np.mean(gw2_lo), np.min(gw2_lo), np.max(gw2_lo)))
+                    print('conv1 >\t zeros: {}%\t mean: {}\t '.format(round(np.sum(c1 <= 0)/np.prod(c1.shape), 4)*100, np.mean(c1)))
+                    print('conv2 >\t zeros: {}%\t mean: {}\t '.format(round(np.sum(c2 <= 0)/np.prod(c2.shape), 4)*100, np.mean(c2)))
+                    print('conv/weight1 >\t mean: {}\t\t min: {}\t\t max: {}\t\t'.format(np.mean(gw1_co), np.min(gw1_co), np.max(gw1_co)))
+                    print('loss/weight1 >\t mean: {}\t\t min: {}\t\t max: {}\t\t'.format(np.mean(gw1_lo), np.min(gw1_lo), np.max(gw1_lo)))
+                    print('conv/weight2 >\t mean: {}\t\t min: {}\t\t max: {}\t\t'.format(np.mean(gw2_co), np.min(gw2_co), np.max(gw2_co)))
+                    print('loss/weight2 >\t mean: {}\t\t min: {}\t\t max: {}\t\t'.format(np.mean(gw2_lo), np.min(gw2_lo), np.max(gw2_lo)))
+                    print('fc1 >\t zeros: {}%\t mean: {}\t '.format(round(np.sum(f1 <= 0)/np.prod(f1.shape), 4)*100, np.mean(f1)))
+                    print('fc2 >\t zeros: {}%\t mean: {}\t '.format(round(np.sum(f2 <= 0)/np.prod(f2.shape), 4)*100, np.mean(f2)))
                     print('-' * 150)
 
                 if not step % FLAGS.checkpoint_interval:
@@ -253,7 +255,7 @@ if __name__ == '__main__':
         if not gf.Exists(FLAGS.log_dir):
             gf.MakeDirs(FLAGS.log_dir)
 
-            board_port = 2223
+            board_port = 3322
             start_bat = '@ echo off\n'
             start_bat += 'echo ' + '\necho '.join(model.setting.replace('|', ' ').splitlines()) + '\n'
             start_bat += 'tensorboard --logdir="." --port=' + str(board_port) + '\n'

@@ -68,7 +68,7 @@ class HCCR_GoogLeNet(object):
                                          self.incp3)
 
             self.pool4 = layer.pooling('AvgPool_5x5', [5, 5], 'AVG')(self.incp4)
-            self.conv4 = layer.convolution('Conv_1x1x128', [1, 1, 128], random='caffe')(self.pool4)
+            self.conv4 = layer.convolution('Conv_1x1x256', [1, 1, 256], random='caffe')(self.pool4)
 
         with layer.default([layer.density], random='gauss:0.01'):
             # self.fc = layer.density('FC_1024', 1024)(self.conv4)
@@ -98,29 +98,34 @@ class HCCR_GoogLeNet(object):
                     grad = tf.gradients(self.loss, val)[0]
                     grad_mean = tf.reduce_mean(grad)
 
+                    tf.summary.scalar('grad', grad_mean)
                     tf.summary.scalar('mean', mean)
                     tf.summary.scalar('stddev', stddev)
-                    tf.summary.scalar('grad_mean', grad_mean)
-
                     tf.summary.histogram('hist', val)
-                    tf.summary.histogram('grad', grad)
 
-        def show_weight_and_bias(*args):
+        def show_grad(**args):
+            for name, val in args.items():
+                with tf.name_scope(name):
+                    grad = tf.gradients(self.loss, val)[0]
+                    grad_mean = tf.reduce_mean(grad)
+                    tf.summary.scalar('grad', grad_mean)
+
+        def show_weight_and_bias(show_fn, *args):
             for var in args:
                 with tf.name_scope(var.naming):
-                    show_tensor(weight=var.vars.weight, bias=var.vars.bias)
+                    show_fn(weight=var.vars.weight, bias=var.vars.bias)
 
-        def show_branch_graph(*args):
+        def show_branch_graph(show_fn, *args):
             for var in args:
                 with tf.name_scope(var.naming):
                     for branch in var.ops.graph:
                         if len(branch) == 1:
                             _, branch_node = branch[0]
-                            show_weight_and_bias(branch_node)
+                            show_weight_and_bias(show_fn, branch_node)
                         else:
                             branch_name = '-'.join(map(lambda x: x[0], branch))
                             with tf.name_scope(branch_name):
-                                show_weight_and_bias(*map(lambda x: x[1], branch))
+                                show_weight_and_bias(show_fn, *map(lambda x: x[1], branch))
 
         with tf.name_scope('Performance'):
             self.accuracy = tf.reduce_mean(tf.cast(
@@ -128,10 +133,15 @@ class HCCR_GoogLeNet(object):
             show_scalar(loss=self.loss, accuracy=self.accuracy)
 
         with tf.name_scope('Convolution'):
-            show_weight_and_bias(self.conv1, self.conv2, self.conv3, self.conv4)
+            show_weight_and_bias(show_tensor, self.conv1, self.conv2, self.conv3, self.conv4)
 
         with tf.name_scope('Inception'):
-            show_branch_graph(self.incp1, self.incp2, self.incp3, self.incp4)
+            show_branch_graph(show_tensor, self.incp1, self.incp2, self.incp3, self.incp4)
 
         with tf.name_scope('FullyConnected'):
-            show_weight_and_bias(self.fc, self.logits)
+            show_weight_and_bias(show_tensor, self.fc, self.logits)
+
+        with tf.name_scope('Gradient'):
+            show_weight_and_bias(show_grad, self.conv1, self.conv2, self.conv3, self.conv4)
+            show_branch_graph(show_grad, self.incp1, self.incp2, self.incp3, self.incp4)
+            show_weight_and_bias(show_grad, self.fc, self.logits)
