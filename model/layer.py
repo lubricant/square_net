@@ -119,17 +119,19 @@ def loss(name):
     return __
 
 
-def convolution(name, k_shape, stride=None, padding=None, random=None, training=None, data_type=None):
+def convolution(name, k_shape, stride=None, padding=None, random=None, active=None, training=None, data_type=None):
 
     __ = _Scope.default_param(convolution)
     stride = __(stride, stride=1)
     random = __(random, random='xavier')
+    active = __(active, active=tf.nn.relu)
     padding = __(padding, padding='valid')
     training = __(training, training=True)
     data_type = __(data_type, data_type=tf.float32)
 
     __assert_type(name, str)
     __assert_type(stride, int)
+    __assert_value(active, tf.sigmoid, tf.tanh, tf.nn.relu, tf.nn.relu6, tf.nn.crelu, tf.nn.softplus, tf.nn.softsign)
     __assert_value(padding.upper(), 'VALID', 'SAME')
     __assert_shape(k_shape, 3)  # k_height, k_width, out_channel = k_shape
 
@@ -144,7 +146,7 @@ def convolution(name, k_shape, stride=None, padding=None, random=None, training=
             filt = tf.get_variable('weight', shape, initializer=__initializer(random), trainable=training, dtype=data_type)
             conv = tf.nn.conv2d(value, filt, [1, stride, stride, 1], padding.upper())
             bias = tf.get_variable('bias', conv.shape[-1:], initializer=__initializer(), trainable=training, dtype=data_type)
-            relu = tf.nn.relu(tf.nn.bias_add(conv, bias))
+            relu = active(tf.nn.bias_add(conv, bias))
             __attach_ops(relu, conv=conv, active=relu)
             __attach_vars(relu, weight=filt, bias=bias)
             return __attach_attr(relu, naming=name)
@@ -193,16 +195,18 @@ def pooling(name, p_shape, mode=None, stride=None, padding=None, training=None, 
     return __
 
 
-def density(name, neurons, linear=None, random=None, training=None, data_type=None):
+def density(name, neurons, linear=None, random=None, active=None, training=None, data_type=None):
 
     __ = _Scope.default_param(density)
     linear = __(linear, linear=False)
     random = __(random, random='gauss')
+    active = __(active, active=tf.nn.relu)
     training = __(training, training=True)
     data_type = __(data_type, data_type=tf.float32)
 
     __assert_type(name, str)
     __assert_type(neurons, int)
+    __assert_value(active, tf.sigmoid, tf.tanh, tf.nn.relu, tf.nn.relu6, tf.nn.crelu, tf.nn.softplus, tf.nn.softsign)
 
     def __(value):
         with tf.variable_scope(name):
@@ -212,7 +216,7 @@ def density(name, neurons, linear=None, random=None, training=None, data_type=No
             weight = tf.get_variable('weight', shape, initializer=__initializer(random), trainable=training, dtype=data_type)
             bias = tf.get_variable('bias', [neurons], initializer=__initializer(), trainable=training, dtype=data_type)
             fc = tf.nn.bias_add(tf.matmul(value, weight), bias)
-            act = None if linear else tf.nn.relu(fc)
+            act = None if linear else active(fc)
 
             dense = fc if linear else act
             __attach_ops(dense, dense=fc, active=act)
