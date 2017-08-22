@@ -212,6 +212,8 @@ class TFRecordFile(File):
 
 if __name__ == '__main__':
 
+    import matplotlib.pyplot as plt
+
     def try_mist():
         cnt = 0
         ch_map = {}
@@ -231,13 +233,17 @@ if __name__ == '__main__':
 
         cnt = 0
         ch_map = {}
-        for name in CasiaFile.list_file(use_db_v10=False, use_db_v11=True, get_train_set=False, get_test_set=True):
+        for name in CasiaFile.list_file(use_db_v10=True, use_db_v11=True, get_train_set=True, get_test_set=False):
             for ch, img in CasiaFile(name):
                 cnt += 1
                 if ch not in ch_map:
                     ch_map[ch] = 0
                 ch_map[ch] += 1
-                print(ch, img.shape)
+                # print(ch, img.shape)
+                # plt.subplot(2, 1, 1)
+                # plt.imshow(img, cmap='gray')
+                # plt.subplot(2, 1, 2)
+                # img = np.subtract(255, img)
                 # plt.imshow(img, cmap='gray')
                 # plt.show()
         print(cnt)
@@ -248,5 +254,5 @@ if __name__ == '__main__':
                                   get_test_set=True))
 
     # try_mist()
-    # try_casi()
+    try_casi()
 

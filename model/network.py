@@ -29,13 +29,12 @@ class HCCR_GoogLeNet(object):
             self.pool1 = layer.pooling('MaxPool_3x3', [3, 3])(self.conv1)
             self.norm1 = layer.normalization('LRN_1')(self.pool1)
 
-            self.conv2 = layer.convolution('Conv_1x1x64', [1, 1, 64], random='caffe')(self.norm1)
+            self.conv2 = layer.convolution('Conv_1x1x64', [1, 1, 64])(self.norm1)
             self.conv3 = layer.convolution('Conv_3x3x192', [3, 3, 192], padding='SAME', random='gauss:0.02')(self.conv2)
             self.norm2 = layer.normalization('LRN_2')(self.conv3)
             self.pool2 = layer.pooling('MaxPool_3x3', [3, 3])(self.norm2)
 
-        with layer.default([layer.inception, layer.convolution], random='caffe'),\
-             layer.default([layer.inception.conv_3x3], random='gauss:0.04', padding='same'),\
+        with layer.default([layer.inception.conv_3x3], random='gauss:0.04', padding='same'),\
              layer.default([layer.inception.conv_5x5], random='gauss:0.08', padding='same'):
 
             self.incp1 = layer.inception('Inception_v1_1',
@@ -68,17 +67,17 @@ class HCCR_GoogLeNet(object):
                                          self.incp3)
 
             self.pool4 = layer.pooling('AvgPool_5x5', [5, 5], 'AVG')(self.incp4)
-            self.conv4 = layer.convolution('Conv_1x1x256', [1, 1, 256], random='caffe')(self.pool4)
+            self.conv4 = layer.convolution('Conv_1x1x256', [1, 1, 256])(self.pool4)
 
         with layer.default([layer.density], random='gauss:0.01'):
-            # self.fc = layer.density('FC_1024', 1024)(self.conv4)
-            # self.dropout = layer.dropout('Dropout')(self.fc)
-            # self.logits = layer.density('FC_3755', 3755, linear=True)(self.dropout)
-            # self.keep_prob = self.dropout.vars.keep_prob
-
             self.fc = layer.density('FC_1024', 1024)(self.conv4)
-            self.logits = layer.density('FC_3755', 3755, linear=True)(self.fc)
-            self.keep_prob = tf.placeholder(tf.float32)
+            self.dropout = layer.dropout('Dropout')(self.fc)
+            self.logits = layer.density('FC_3755', 3755, linear=True)(self.dropout)
+            self.keep_prob = self.dropout.vars.keep_prob
+
+            # self.fc = layer.density('FC_1024', 1024)(self.conv4)
+            # self.logits = layer.density('FC_3755', 3755, linear=True)(self.fc)
+            # self.keep_prob = tf.placeholder(tf.float32)
 
         self.loss = layer.loss('Loss')(self.logits, self.labels)
 

@@ -2,13 +2,15 @@ import inspect
 import os
 import glob
 
+import numpy as np
 import tensorflow as tf
 from tensorflow.python import gfile as gf
 
 import data as this
 
 PWD = os.path.abspath(os.path.join(inspect.getfile(this), os.pardir)).replace('\\', '/')
-RECORD_ROOT = 'G:'
+# RECORD_ROOT = 'G:'
+RECORD_ROOT = 'F:'
 TEMP_ROOT = 'G:'
 
 NUM_CLASSES = 3755
@@ -68,6 +70,7 @@ def data_queue(data_set, batch_size, thread_num=1, epoch_num=None):
 
 if __name__ == '__main__':
 
+    from PIL import Image
     from matplotlib import pyplot as plt
     from data.cv_filter import *
     from data.dt_trans import *
@@ -100,7 +103,16 @@ if __name__ == '__main__':
             coord.join(threads)
 
     def try_rand_queue():
-        image_batch, label_batch = data_queue(data_set=DS_TEST, batch_size=100, epoch_num=1)
+
+        def save_image(images, labels, dir_path='D:/picture/'):
+            for a, b in zip(images, labels):
+                prefix, suffix = dir_path+ch_dict[b], ''
+                while os.path.exists(prefix+suffix+'.png'):
+                    suffix += '_'
+                a = a.astype(np.uint8).reshape(a.shape[:-1])
+                Image.fromarray(a).save(prefix+suffix+'.jpg')
+
+        image_batch, label_batch = data_queue(data_set=DS_TRAIN, batch_size=100, epoch_num=1)
         init_op = tf.group(tf.initialize_all_variables(),
                            tf.initialize_local_variables())
         with tf.Session() as sess:
@@ -111,21 +123,19 @@ if __name__ == '__main__':
 
             for i in range(50):
                 image, label = sess.run([image_batch, label_batch])
-                print([(i, ch_dict[i]) for i in label])
-                print(image.shape, type(image.shape[0]))
                 # gabor_filter = GaborFilter((100, 100))
                 # gabor_part = np.array()
 
-                img, idx = image[0], label[0]
-                mean, stddev = np.mean(img), np.std(img)
-                img -= mean
-                img /= stddev
-                print(ch_dict[idx], np.mean(img), np.std(img))
-                # print(img.reshape((120, 120)))
+                save_image(image, label)
 
-                plt.imshow(img.reshape(img.shape[:-1]), cmap='gray')
-                plt.show()
-                return
+                # img, idx = image[0], label[0]
+                # mean, stddev = np.mean(img), np.std(img)
+                # img -= mean
+                # img /= stddev
+                # print(ch_dict[idx], np.mean(img), np.std(img))
+
+                # plt.imshow(img.reshape(img.shape[:-1]), cmap='gray')
+                # plt.show()
 
             coord.request_stop()
             coord.join(threads)

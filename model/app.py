@@ -65,7 +65,7 @@ def training_routine(network, queue_op):
     with tf.Session(config=config) as sess:
         sess.run(init_op)
 
-        saver = tf.train.Saver(name='Saver')
+        saver = tf.train.Saver(name='Saver', max_to_keep=15)
         writer = tf.summary.FileWriter(FLAGS.log_dir, sess.graph)
 
         logging.info('Loading checkpoint ...')
@@ -171,6 +171,8 @@ def evaluating_routine(network, queue_op):
             while True:
 
                 images, labels = sess.run(queue_op)
+                images -= np.mean(images)
+
                 logits = sess.run(network.logits, {network.images: images, network.keep_prob: 1.})
 
                 inference = np.argmax(logits, axis=-1)
@@ -187,6 +189,8 @@ def evaluating_routine(network, queue_op):
                     total_error += 1
 
                 samples_num += len(labels)
+
+                logging.info('Running test...')
 
         except tf.errors.OutOfRangeError:
             pass
