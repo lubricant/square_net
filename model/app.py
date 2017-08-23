@@ -151,9 +151,14 @@ def evaluating_routine(network, queue_op):
         saver = tf.train.Saver()
 
         logging.info('Loading checkpoint ...')
-        checkpoint = tf.train.get_checkpoint_state(FLAGS.checkpoint_dir)
-        assert checkpoint and checkpoint.model_checkpoint_path
-        saver.restore(sess, checkpoint.model_checkpoint_path)
+        if FLAGS.restore_version is not None and FLAGS.restore_version >= 0:
+            logging.info('Restoring checkpoint [%d]', FLAGS.restore_version)
+            saver.restore(sess, FLAGS.checkpoint_file + '-' + str(FLAGS.restore_version))
+        else:
+            logging.info('Restoring last checkpoint')
+            checkpoint = tf.train.get_checkpoint_state(FLAGS.checkpoint_dir)
+            assert checkpoint and checkpoint.model_checkpoint_path
+            saver.restore(sess, checkpoint.model_checkpoint_path)
         logging.info('Loading checkpoint done')
 
         coord = tf.train.Coordinator()
@@ -171,7 +176,10 @@ def evaluating_routine(network, queue_op):
             while True:
 
                 images, labels = sess.run(queue_op)
-                images -= np.mean(images)
+
+                mean, stddev = np.mean(images), np.std(images)
+                images -= mean
+                images /= stddev
 
                 logits = sess.run(network.logits, {network.images: images, network.keep_prob: 1.})
 
@@ -189,8 +197,6 @@ def evaluating_routine(network, queue_op):
                     total_error += 1
 
                 samples_num += len(labels)
-
-                logging.info('Running test...')
 
         except tf.errors.OutOfRangeError:
             pass
@@ -238,7 +244,6 @@ def evaluating_routine(network, queue_op):
         Best {N} Recall: {best_recall}
             
         Worst {N} Recall: {worst_recall}
-            
         """.format(N=top_N,
                    total_num=samples_num,
                    accuracy=accuracy,
@@ -246,6 +251,38 @@ def evaluating_routine(network, queue_op):
                    worst_precision=arg_fmt(worst_precision, precision),
                    best_recall=arg_fmt(best_recall, recall),
                    worst_recall=arg_fmt(worst_recall, recall)))
+
+        ch_precision = []
+        for arg in arg_precision:
+            ch_precision.append((reverse_dict[arg], precision[arg]))
+
+        precision_num = {
+            'n_100_95': len(precision[precision > 0.95]),
+            'n_95_90': len(precision[np.where((0.9 < precision) & (precision <= 0.95))]),
+            'n_90_80': len(precision[np.where((0.8 < precision) & (precision <= 0.9))]),
+            'n_80_70': len(precision[np.where((0.7 < precision) & (precision <= 0.8))]),
+            'n_70_60': len(precision[np.where((0.6 < precision) & (precision <= 0.7))]),
+            'n_60_50': len(precision[np.where((0.5 < precision) & (precision <= 0.6))]),
+            'n_50_00': len(precision[precision <= 0.5]),
+        }
+
+        precision_per = {}
+        for key in precision_num.keys():
+            precision_per[key.replace('n', 'p')] = precision_num[key] / len(precision) * 100
+
+        print("""
+        Precision Statistic:
+        [1.00 - 0.95) : {p_100_95:.2f}% ({n_100_95})
+        [0.95 - 0.90) : {p_95_90:.2f}% ({n_95_90})
+        [0.90 - 0.80) : {p_90_80:.2f}% ({n_90_80})
+        [0.80 - 0.70) : {p_80_70:.2f}% ({n_80_70})
+        [0.70 - 0.60) : {p_70_60:.2f}% ({n_70_60})
+        [0.60 - 0.50) : {p_60_50:.2f}% ({n_60_50})
+        [0.50 - 0.00] : {p_50_00:.2f}% ({n_50_00})
+        
+        Precision Detail:
+        {ch_precision}
+        """.format(ch_precision=ch_precision, **precision_num, **precision_per))
 
 
 if __name__ == '__main__':

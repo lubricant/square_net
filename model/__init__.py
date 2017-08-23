@@ -36,9 +36,9 @@ flags.DEFINE_string('trace_file', data.TEMP_ROOT + '/tmp/trace.ctf.json', 'Chrom
 
 if tf.app.flags.FLAGS.is_training:
     flags.DEFINE_string('data_set', data.DS_TRAIN, 'Application execute mode.')
-    flags.DEFINE_integer('epoch_num', 3, 'Number of epochs to run trainer.')
+    flags.DEFINE_integer('epoch_num', 5, 'Number of epochs to run trainer.')
     flags.DEFINE_integer("thread_num", 5, 'Number of thread to read data.')
-    flags.DEFINE_integer('batch_size', 100, 'Batch size of each step.')
+    flags.DEFINE_integer('batch_size', 200, 'Batch size of each step.')
 
     flags.DEFINE_string('model_solver', 'Adam', 'Solver name, like: SGD, Momentum, AdaDelta, Adam')
 else:
@@ -46,6 +46,8 @@ else:
     flags.DEFINE_integer('epoch_num', 1, 'Number of epochs to run trainer.')
     flags.DEFINE_integer("thread_num", 1, 'Number of thread to read data.')
     flags.DEFINE_integer('batch_size', 100, 'Batch size of each step.')
+
+    flags.DEFINE_integer('restore_version', -1, 'Specify the checkpoint to be restored.')
 
 '''
     Custom logging config

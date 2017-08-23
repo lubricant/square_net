@@ -108,7 +108,9 @@ if __name__ == '__main__':
         example[:, offset:100:offset] = 0
         return example
 
-    _, img = next(iter(CasiaFile('train/1001-c.gnt')))
+
+    f = CasiaFile.list_file(use_db_v10=True, get_train_set=True)[0]
+    _, img = next(iter(CasiaFile(f)))
     slid = None
 
     def update_distort(factor=1):

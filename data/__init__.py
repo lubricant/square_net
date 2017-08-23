@@ -9,8 +9,7 @@ from tensorflow.python import gfile as gf
 import data as this
 
 PWD = os.path.abspath(os.path.join(inspect.getfile(this), os.pardir)).replace('\\', '/')
-# RECORD_ROOT = 'G:'
-RECORD_ROOT = 'F:'
+RECORD_ROOT = 'G:'
 TEMP_ROOT = 'G:'
 
 NUM_CLASSES = 3755
