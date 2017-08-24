@@ -62,7 +62,8 @@ def prepare_label_dict(dict_name='labels_dict.npy'):
     logging.info('Finish preparing label dict.')
 
 
-def prepare_image_files(file_name, data_set, img_per_file=100000, ch2idx_dict=None, img_filter=lambda _: _):
+def prepare_image_files(file_name, data_set, img_per_file=100000, ch2idx_dict=None, img_filter=lambda _: _,
+                        img_transfer=None):
     '''
     将原始图片文件转换为 TFRecord 格式的文件
     '''
@@ -111,7 +112,7 @@ def prepare_image_files(file_name, data_set, img_per_file=100000, ch2idx_dict=No
     if data_set.upper() == 'TRAINING':
         casi_db_10 = CasiaFile.list_file(get_train_set=True, get_test_set=False, use_db_v10=True)
         casi_db_11 = CasiaFile.list_file(get_train_set=True, get_test_set=False, use_db_v11=True)
-        start_reader('train', casi_db_10, casi_db_11)
+        start_reader('train', casi_db_10, casi_db_11, casi_img_transfer=img_transfer)
 
     if data_set.upper() == 'TEST':
         casi_db_10 = CasiaFile.list_file(get_train_set=False, get_test_set=True, use_db_v10=True)
@@ -120,6 +121,24 @@ def prepare_image_files(file_name, data_set, img_per_file=100000, ch2idx_dict=No
 
 
 if __name__ == '__main__':
+
+    def deform_transfer():
+        factor_33 = [DT.DT_TOP, DT.DT_LEFT, DT.DT_TOP | DT.DT_LEFT]
+        factor_19 = [DT.DT_BOTTOM, DT.DT_RIGHT, DT.DT_TOP | DT.DT_RIGHT,
+                     DT.DT_BOTTOM | DT.DT_LEFT, DT.DT_BOTTOM | DT.DT_RIGHT,
+                     DT.DT_HORIZON_EXPAND, DT.DT_HORIZON_SHRINK,
+                     DT.DT_VERTICAL_EXPAND, DT.DT_VERTICAL_SHRINK]
+        # factor_15 = [DT.DT_HORIZON_EXPAND | DT.DT_VERTICAL_EXPAND,
+        #              DT.DT_HORIZON_EXPAND | DT.DT_VERTICAL_SHRINK,
+        #              DT.DT_HORIZON_SHRINK | DT.DT_VERTICAL_EXPAND,
+        #              DT.DT_HORIZON_SHRINK | DT.DT_VERTICAL_SHRINK]
+
+        trans_33, trans_19, trans_15 = Deform(3.3), Deform(1.95), Deform(1.6)
+        return ([lambda im, f=flag: trans_33.transform(im, f) for flag in factor_33]
+                + [lambda im, f=flag: trans_19.transform(im, f) for flag in factor_19]
+                # + [lambda im, f=flag: trans_15.transform(im, f) for flag in factor_15]
+                )
+
     import sys
     logging.basicConfig(level=logging.DEBUG,
                         format='[%(asctime)s][%(threadName)s] %(message)s',
@@ -132,8 +151,9 @@ if __name__ == '__main__':
     filter = AlignFilter(size=(IMG_SIZE, IMG_SIZE), constant_values=0)
     resize = lambda x: filter.filter(x)
 
-    _, reverse_dict = label_dict()
+    # transfer_list = deform_transfer()
 
+    _, reverse_dict = label_dict()
     # prepare_label_dict()
     # prepare_image_files(TRAIN_SET_PREFIX+'_%d.tfr', data_set='TRAINING', ch2idx_dict=reverse_dict, img_filter=resize)
     # prepare_image_files(TEST_SET_PREFIX+'_%d.tfr', data_set='TEST', ch2idx_dict=reverse_dict, img_filter=resize)

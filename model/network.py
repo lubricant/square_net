@@ -13,6 +13,8 @@ class Net(object):
     @staticmethod
     def _show_tensor(loss, **args):
         for name, val in args.items():
+            if val is None:
+                continue
             with tf.name_scope(name):
                 mean = tf.reduce_mean(val)
                 stddev = tf.sqrt(tf.reduce_mean(tf.square(val - mean)))
@@ -28,6 +30,8 @@ class Net(object):
     @staticmethod
     def _show_grad(loss, **args):
         for name, val in args.items():
+            if val is None:
+                continue
             with tf.name_scope(name):
                 grad = tf.gradients(loss, val)[0]
                 grad_mean = tf.reduce_mean(grad)
@@ -124,10 +128,6 @@ class HCCR_GoogLeNet(Net):
             self.dropout = layer.dropout('Dropout')(self.fc)
             self.logits = layer.density('FC_3755', 3755, linear=True)(self.dropout)
             self.keep_prob = self.dropout.vars.keep_prob
-
-            # self.fc = layer.density('FC_1024', 1024)(self.conv4)
-            # self.logits = layer.density('FC_3755', 3755, linear=True)(self.fc)
-            # self.keep_prob = tf.placeholder(tf.float32)
 
         self.loss = layer.loss('Loss')(self.logits, self.labels)
 

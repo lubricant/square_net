@@ -179,7 +179,7 @@ class MNISTReader(object):
 
 class CASIAReader(object):
 
-    def __init__(self, file_list, img_transfer=None, hccr_classes=3755):
+    def __init__(self, file_list, img_transfer=None):
         assert len(file_list)
         self.file_list = [CasiaFile(f) for f in file_list]
         self.img_transfer = img_transfer
@@ -203,6 +203,7 @@ class CASIAReader(object):
                 batch = [(ch, img)]
                 if img_transfer:
                     batch += [(ch, trans(img)) for trans in img_transfer]
+                    print(batch[-1][1].dtype, batch[-1])
                 yield batch
                 img_num += len(batch)
 

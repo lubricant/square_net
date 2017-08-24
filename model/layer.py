@@ -119,7 +119,7 @@ def loss(name):
     return __
 
 
-def convolution(name, k_shape, stride=None, padding=None, random=None, active=None, training=None, data_type=None):
+def convolution(name, k_shape, stride=None, padding=None, random=None, active=None, batch_norm=None, training=None, data_type=None):
 
     __ = _Scope.default_param(convolution)
     stride = __(stride, stride=1)
@@ -128,6 +128,7 @@ def convolution(name, k_shape, stride=None, padding=None, random=None, active=No
     padding = __(padding, padding='valid')
     training = __(training, training=True)
     data_type = __(data_type, data_type=tf.float32)
+    batch_norm = __(batch_norm, batch_norm=None)
 
     __assert_type(name, str)
     __assert_type(stride, int)
@@ -145,11 +146,18 @@ def convolution(name, k_shape, stride=None, padding=None, random=None, active=No
 
             filt = tf.get_variable('weight', shape, initializer=__initializer(random), trainable=training, dtype=data_type)
             conv = tf.nn.conv2d(value, filt, [1, stride, stride, 1], padding.upper())
-            bias = tf.get_variable('bias', conv.shape[-1:], initializer=__initializer(), trainable=training, dtype=data_type)
-            relu = active(tf.nn.bias_add(conv, bias))
-            __attach_ops(relu, conv=conv, active=relu)
-            __attach_vars(relu, weight=filt, bias=bias)
-            return __attach_attr(relu, naming=name)
+
+            if batch_norm:
+                bias = None
+                output = normalization('batch_norm', 'BATCH', training=training, data_type=data_type)(conv)
+            else:
+                bias = tf.get_variable('bias', conv.shape[-1:], initializer=__initializer(), trainable=training, dtype=data_type)
+                output = tf.nn.bias_add(conv, bias)
+
+            act = active(output)
+            __attach_ops(act, conv=conv, active=act)
+            __attach_vars(act, weight=filt, bias=bias)
+            return __attach_attr(act, naming=name)
 
     return __
 
@@ -335,12 +343,17 @@ def normalization(name, mode=None, training=None, data_type=None,
 
     __assert_value(mode.upper(), 'LOCAL', 'BATCH')
 
-    def local_resp_norm(value):
+    depth = __(local_depth, local_depth=5)
+    bias = __(local_bias, local_bias=1.)
+    alpha = __(local_alpha, local_alpha=1.)
+    beta = __(local_beta, local_beta=.5)
 
-        depth = __(local_depth, local_depth=5)
-        bias = __(local_bias, local_bias=1.)
-        alpha = __(local_alpha, local_alpha=1.)
-        beta = __(local_beta, local_beta=.5)
+    scaling = __(batch_scale, batch_scale=False)
+    shifting = __(batch_shift, batch_shift=True)
+    epsilon = __(batch_epsilon, batch_epsilon=0.001)
+    decay = __(batch_decay, batch_decay=.999)
+
+    def local_resp_norm(value):
 
         with tf.name_scope(name):
             norm = tf.nn.local_response_normalization(
@@ -350,10 +363,6 @@ def normalization(name, mode=None, training=None, data_type=None,
             return __attach_attr(norm, naming=name)
 
     def batch_norm(value):
-        scaling = __(batch_scale, batch_scale=False)
-        shifting = __(batch_shift, batch_shift=True)
-        epsilon = __(batch_epsilon, batch_epsilon=0.001)
-        decay = __(batch_decay, batch_decay=.999)
 
         with tf.variable_scope(name):
             __assert_shape(value.get_shape(), 2, 4)  # density or conv2d
