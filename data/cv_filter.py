@@ -6,16 +6,20 @@ import numpy as np
 
 class BinaryFilter(object):
 
-    def __init__(self, inverse=False, otsu=False):
+    def __init__(self, inverse=False, otsu=False, std=True):
         self.__inverse = inverse
         self.__otsu_thresh = otsu
+        self.__stddev_thresh = std
 
     def filter(self, image):
         if self.__otsu_thresh:
             return cv2.threshold(image, 0, 255, cv2.THRESH_OTSU | (
                 cv2.THRESH_BINARY_INV if self.__inverse else cv2.THRESH_BINARY))[1]
         else:
-            return cv2.threshold(image, np.mean(image), 255, (
+            thresh = np.mean(image)
+            if self.__stddev_thresh:
+                thresh += np.std(image) / 2
+            return cv2.threshold(image, thresh, 255, (
                 cv2.THRESH_BINARY_INV if self.__inverse else cv2.THRESH_BINARY))[1]
 
 

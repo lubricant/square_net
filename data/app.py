@@ -11,6 +11,7 @@ from data.fmt_file import *
 PWD/data
 |----casia：    [CASIA 所有文件]
 |----mnist：    [MNIST 所有文件]
+|----hit_ch：   [HIT(character) 所有文件]
 
 RECORD_ROOT     [任意一个磁盘目录，在 __init__ 中定义]
 |----record:

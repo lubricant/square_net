@@ -211,6 +211,42 @@ class CASIAReader(object):
             logging.info('got {} from file {}'.format(img_num, file.name))
 
 
+class HITReader(object):
+
+    def __init__(self, file_list, ch_dict, img_transfer=None):
+        assert len(file_list)
+        self.file_list = [CasiaFile(f) for f in file_list]
+        self.ch_dict = ch_dict
+        self.img_transfer = img_transfer
+        self.total_img_num = 0
+
+    def __enter__(self):
+        file_num = len(self.file_list)
+        extra_num = 0 if not self.img_transfer else len(self.img_transfer)
+        logging.info('Process {} HIT files with extra {} images]'.
+                     format(file_num, extra_num))
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        pass
+
+    def __iter__(self):
+
+        img_transfer = self.img_transfer
+        for file in self.file_list:
+            img_num = 0
+            for ch, img in file:
+                if ch not in self.ch_dict:
+                    continue
+                batch = [(ch, img)]
+                if img_transfer:
+                    batch += [(ch, trans(img)) for trans in img_transfer]
+                yield batch
+                img_num += len(batch)
+
+            self.total_img_num += img_num
+            logging.info('got {} from file {}'.format(img_num, file.name))
+
+
 if __name__ == '__main__':
 
     queue = Queue(maxsize=2)

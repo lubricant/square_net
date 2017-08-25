@@ -54,35 +54,36 @@ class MnistFile(File):
         self.__reverse = reverse_pixel
 
     def __iter__(self):
-        img_file = open(self.__img_path, 'rb')
-        lab_file = open(self.__lab_path, 'rb')
-        img_buf, lab_buf = img_file.read(), lab_file.read()
 
-        def read_img():
-            head = struct.unpack_from('>4I', img_buf, 0)
-            magic_num, img_num, img_row, img_col = head
+        with open(self.__img_path, 'rb') as img_file, open(self.__lab_path, 'rb') as lab_file:
 
-            offset = struct.calcsize('>4I')
-            pixels = img_num * img_row * img_col
+            img_buf, lab_buf = img_file.read(), lab_file.read()
 
-            images = struct.unpack_from('>%dB' % pixels, img_buf, offset)
-            assert len(images) / (img_row * img_col) == img_num
+            def read_img():
+                head = struct.unpack_from('>4I', img_buf, 0)
+                magic_num, img_num, img_row, img_col = head
 
-            return np.array(images, dtype=np.uint8).reshape(img_num, img_row, img_col)
+                offset = struct.calcsize('>4I')
+                pixels = img_num * img_row * img_col
 
-        def read_lab():
-            head = struct.unpack_from('>2I', lab_buf, 0)
-            magic_num, lab_num = head
+                images = struct.unpack_from('>%dB' % pixels, img_buf, offset)
+                assert len(images) / (img_row * img_col) == img_num
 
-            offset = struct.calcsize('>2I')
-            labels = struct.unpack_from('>%dB' % lab_num, lab_buf, offset)
+                return np.array(images, dtype=np.uint8).reshape(img_num, img_row, img_col)
 
-            return np.array(labels, dtype=np.uint8)
+            def read_lab():
+                head = struct.unpack_from('>2I', lab_buf, 0)
+                magic_num, lab_num = head
 
-        for ch, img in zip(read_lab(), read_img()):
-            if self.__reverse:
-                np.subtract(255, img, img)
-            yield str(ch), img
+                offset = struct.calcsize('>2I')
+                labels = struct.unpack_from('>%dB' % lab_num, lab_buf, offset)
+
+                return np.array(labels, dtype=np.uint8)
+
+            for ch, img in zip(read_lab(), read_img()):
+                if self.__reverse:
+                    np.subtract(255, img, img)
+                yield str(ch), img
 
 
 class CasiaFile(File):
@@ -130,18 +131,63 @@ class CasiaFile(File):
 
         assert not path.isdir(self.__path)
         size = path.getsize(self.__path)
-        file = open(self.__path, 'rb')
 
-        while file.tell() < size:
-            length, = struct.unpack('<I', file.read(4))
-            code = file.read(2)
-            col, row = struct.unpack('<2H', file.read(4))
-            data_len = length - 10
-            data_tag = code.decode('gbk')
-            data_img = np.fromstring(file.read(data_len), np.uint8).reshape((row, col))
-            if self.__reverse:
-                np.subtract(255, data_img, data_img)
-            yield (data_tag, data_img)
+        with open(self.__path, 'rb') as file:
+            while file.tell() < size:
+                length, = struct.unpack('<I', file.read(4))
+                code = file.read(2)
+                col, row = struct.unpack('<2H', file.read(4))
+                data_len = length - 10
+                data_tag = code.decode('gbk')
+                data_img = np.fromstring(file.read(data_len), np.uint8).reshape((row, col))
+                if self.__reverse:
+                    np.subtract(255, data_img, data_img)
+                yield (data_tag, data_img)
+
+
+class HITFile(File):
+    '''
+    HIT-ORC 手写中文数据集
+        采用 GBK 编码，总共包含 ? 个常用字符与汉字，每张图片大小为 128x128
+    '''
+
+    @staticmethod
+    def list_file(full_path=True):
+
+        images_files = ['%d_images' % i for i in range(1, 123)]
+        images_paths = [PWD + '/hit_ch/' + f for f in images_files]
+        assert all(path.exists(p) for p in images_paths if path.isfile(p))
+
+        labels_file = ['labels'] * 122
+        labels_path = [PWD + '/hit_ch/labels'] * 122
+        assert path.exists(labels_path[0])
+
+        return [*zip(images_paths, labels_path)] if full_path else [*zip(images_files, labels_file)]
+
+    def __init__(self, image_filename, label_filename, reverse_pixel=True):
+        super().__init__((path.basename(image_filename),
+                          path.basename(label_filename)))
+        assert path.exists(image_filename) and path.exists(label_filename)
+        self.__img_path = image_filename
+        self.__lab_path = label_filename
+        self.__reverse = reverse_pixel
+
+    def __iter__(self):
+
+        with open(self.__img_path, 'rb') as img_file, open(self.__lab_path, 'rb') as lab_file:
+
+            img_num, row, col = struct.unpack('<IBB', img_file.read(6))
+            lab_num, ch_bytes = struct.unpack('<HB', lab_file.read(3))
+            assert img_num == lab_num
+
+            labels = lab_file.read(lab_num * ch_bytes).decode('GBK')
+            assert len(labels) == lab_num
+
+            for ch in labels:
+                image = np.fromfile(img_file, np.uint8, row * col).reshape((row, col))
+                if self.__reverse:
+                    np.subtract(255, image, image)
+                yield ch, image
 
 
 class TFRecordFile(File):
@@ -253,6 +299,24 @@ if __name__ == '__main__':
         print(CasiaFile.list_file(full_path=False, use_db_v10=True, use_db_v11=True, get_train_set=False,
                                   get_test_set=True))
 
-    # try_mist()
-    try_casi()
+    def try_hit():
+        cnt = 0
+        ch_map = {}
+        for name in HITFile.list_file():
+            for ch, img in HITFile(*name):
+                cnt += 1
+                if ch not in ch_map:
+                    ch_map[ch] = 0
+                ch_map[ch] += 1
+                print(ch, img.shape)
+                # plt.imshow(img, cmap='gray')
+                # plt.show()
+        print(cnt)
+        print(str(ch_map))
+        print(len(ch_map))
+        print(sorted(ch_map.keys()))
+        print(HITFile.list_file())
 
+    # try_mist()
+    # try_casi()
+    try_hit()
