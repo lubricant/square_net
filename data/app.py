@@ -71,8 +71,8 @@ def prepare_image_files(file_name, data_set, img_per_file=100000, ch2idx_dict=No
 
     assert data_set.upper() in ('TRAINING', 'TEST', 'ALL')
 
-    def start_reader(dir_prefix, casi_files_10, casi_files_11,
-                     casi_img_transfer=None, queue_writer_num=3):
+    def start_reader(dir_prefix, casi_files_10, casi_files_11, hit_ch_files=None,
+                     image_transfer=None, queue_writer_num=3):
 
         logging.info('Start preparing image file ......')
 
@@ -80,27 +80,29 @@ def prepare_image_files(file_name, data_set, img_per_file=100000, ch2idx_dict=No
 
         img_queue = queue.Queue(maxsize=100)
 
-        casi_reader = []
+        img_reader = []
         if casi_files_10:
-            casi_reader += [Producer(CASIAReader(casi_files_10, casi_img_transfer), img_queue)]
+            img_reader += [Producer(CASIAReader(casi_files_10, image_transfer), img_queue)]
         if casi_files_11:
-            casi_reader += [Producer(CASIAReader(casi_files_11, casi_img_transfer), img_queue)]
+            img_reader += [Producer(CASIAReader(casi_files_11, image_transfer), img_queue)]
+        if hit_ch_files:
+            img_reader += [Producer(HITReader(hit_ch_files, ch2idx_dict, image_transfer), img_queue)]
 
         tf_writer_seq = [dir_prefix] if queue_writer_num < 2 else (
                         [dir_prefix + '_' + str(i) for i in range(queue_writer_num)])
-        tf_writer = [Consumer(casi_reader, TFWriter(dir_with_seq, img_queue,
-                                                    forward_dict=ch2idx_dict,
-                                                    filename_template=file_name,
-                                                    img_per_file=img_per_file,
-                                                    img_filter=img_filter), img_queue)
+        tf_writer = [Consumer(img_reader, TFWriter(dir_with_seq, img_queue,
+                                                   forward_dict=ch2idx_dict,
+                                                   filename_template=file_name,
+                                                   img_per_file=img_per_file,
+                                                   img_filter=img_filter), img_queue)
                      for dir_with_seq in tf_writer_seq]
 
         [ensure_dir(dir_with_seq) for dir_with_seq in tf_writer_seq]
-        [reader.start() for reader in casi_reader]
+        [reader.start() for reader in img_reader]
         [writer.start() for writer in tf_writer]
         [writer.join() for writer in tf_writer]
 
-        total_casi_num = sum([reader.data_src.total_img_num for reader in casi_reader])
+        total_casi_num = sum([reader.data_src.total_img_num for reader in img_reader])
         logging.info('Total CASIA image: {}'.format(total_casi_num))
 
         logging.info('Finish preparing image file')
@@ -113,7 +115,8 @@ def prepare_image_files(file_name, data_set, img_per_file=100000, ch2idx_dict=No
     if data_set.upper() == 'TRAINING':
         casi_db_10 = CasiaFile.list_file(get_train_set=True, get_test_set=False, use_db_v10=True)
         casi_db_11 = CasiaFile.list_file(get_train_set=True, get_test_set=False, use_db_v11=True)
-        start_reader('train', casi_db_10, casi_db_11, casi_img_transfer=img_transfer)
+        hit_db = HITFile.list_file()
+        start_reader('train', casi_db_10, casi_db_11, hit_ch_files=hit_db, image_transfer=img_transfer)
 
     if data_set.upper() == 'TEST':
         casi_db_10 = CasiaFile.list_file(get_train_set=False, get_test_set=True, use_db_v10=True)

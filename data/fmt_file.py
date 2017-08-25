@@ -148,7 +148,7 @@ class CasiaFile(File):
 class HITFile(File):
     '''
     HIT-ORC 手写中文数据集
-        采用 GBK 编码，总共包含 ? 个常用字符与汉字，每张图片大小为 128x128
+        采用 GBK 编码，总共包含 6825 个常用字符与汉字，每类 122 个样本，每张图片大小为 128x128
     '''
 
     @staticmethod
