@@ -125,7 +125,7 @@ def convolution(name, k_shape, stride=None, padding=None, random=None, active=No
     stride = __(stride, stride=1)
     random = __(random, random='xavier')
     active = __(active, active=tf.nn.relu)
-    padding = __(padding, padding='valid')
+    padding = __(padding, padding='valid').upper()
     training = __(training, training=True)
     data_type = __(data_type, data_type=tf.float32)
     batch_norm = __(batch_norm, batch_norm=None)
@@ -133,7 +133,7 @@ def convolution(name, k_shape, stride=None, padding=None, random=None, active=No
     __assert_type(name, str)
     __assert_type(stride, int)
     __assert_value(active, tf.sigmoid, tf.tanh, tf.nn.relu, tf.nn.relu6, tf.nn.crelu, tf.nn.softplus, tf.nn.softsign)
-    __assert_value(padding.upper(), 'VALID', 'SAME')
+    __assert_value(padding, 'VALID', 'SAME')
     __assert_shape(k_shape, 3)  # k_height, k_width, out_channel = k_shape
 
     def __(value):
@@ -145,7 +145,7 @@ def convolution(name, k_shape, stride=None, padding=None, random=None, active=No
             shape = [k_height, k_width, in_channel, out_channel]
 
             filt = tf.get_variable('weight', shape, initializer=__initializer(random), trainable=training, dtype=data_type)
-            conv = tf.nn.conv2d(value, filt, [1, stride, stride, 1], padding.upper())
+            conv = tf.nn.conv2d(value, filt, [1, stride, stride, 1], padding)
 
             if batch_norm:
                 bias = None
@@ -165,24 +165,24 @@ def convolution(name, k_shape, stride=None, padding=None, random=None, active=No
 def pooling(name, p_shape, mode=None, stride=None, padding=None, training=None, data_type=None):
 
     __ = _Scope.default_param(pooling)
-    mode = __(mode, mode='MAX')
+    mode = __(mode, mode='MAX').upper()
     stride = __(stride, stride=1)
-    padding = __(padding, padding='valid')
+    padding = __(padding, padding='valid').upper()
     training = __(training, training=True)
     data_type = __(data_type, data_type=tf.float32)
 
     __assert_type(name, str)
     __assert_type(mode, str)
     __assert_type(stride, int)
-    __assert_value(mode.upper(), 'MAX', 'AVG')
-    __assert_value(padding.upper(), 'VALID', 'SAME')
+    __assert_value(mode, 'MAX', 'AVG')
+    __assert_value(padding, 'VALID', 'SAME')
     __assert_shape(p_shape, 2, 3)  # p_height, p_width[, p_depth] = p_shape
 
     def __(value):
 
         # if not specific depth of pooling
         if len(p_shape):
-            p_func = tf.nn.max_pool if mode.upper() == 'MAX' else tf.nn.avg_pool
+            p_func = tf.nn.max_pool if mode == 'MAX' else tf.nn.avg_pool
             with tf.name_scope(name):
                 pool = p_func(value, [1] + p_shape + [1], [1, stride, stride, 1], padding.upper(), name=mode.lower() + '_pool')
                 __attach_ops(pool, conv=None, pool=pool)
@@ -337,11 +337,11 @@ def normalization(name, mode=None, training=None, data_type=None,
                   local_depth=None, local_bias=None, local_alpha=None, local_beta=None):
 
     __ = _Scope.default_param(normalization)
-    mode = __(mode, mode='BATCH')
+    mode = __(mode, mode='BATCH').upper()
     training = __(training, training=True)
     data_type = __(data_type, data_type=tf.float32)
 
-    __assert_value(mode.upper(), 'LOCAL', 'BATCH')
+    __assert_value(mode, 'LOCAL', 'BATCH')
 
     depth = __(local_depth, local_depth=5)
     bias = __(local_bias, local_bias=1.)
