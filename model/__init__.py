@@ -16,8 +16,6 @@ flags.DEFINE_boolean('exp_decay', False, 'Applying exponential decay to the lear
 
 flags.DEFINE_float('learning_rate', 0.00001, 'Initial learning rate.')
 flags.DEFINE_float('final_learning_rate', 0.000005, 'Final learning rate for decay.')
-# flags.DEFINE_float('learning_rate', 0.000005, 'Initial learning rate.')
-# flags.DEFINE_float('final_learning_rate', 0.0000001, 'Final learning rate for decay.')
 flags.DEFINE_float('decay_rate', 0.9, 'Base number of exponential decay rate.')
 flags.DEFINE_float('keep_prob', 0.6, 'Keep probability for training dropout.')
 
