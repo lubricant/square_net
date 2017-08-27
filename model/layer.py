@@ -119,20 +119,21 @@ def loss(name):
     return __
 
 
-def convolution(name, k_shape, stride=None, padding=None, random=None, activation=None,
-                depth_separable=False, batch_norm=None, training=None, data_type=None):
+def convolution(name, k_shape, stride=None, padding=None, mode=None, random=None, activation=None, batch_norm=None, training=None, data_type=None):
 
     __ = _Scope.default_param(convolution)
+    mode = __(mode, mode='standard').upper()
     stride = __(stride, stride=1)
     random = __(random, random='xavier')
     padding = __(padding, padding='valid').upper()
     activation = __(activation, activation=tf.nn.relu)
     training = __(training, training=True)
     data_type = __(data_type, data_type=tf.float32)
-    batch_norm = __(batch_norm, batch_norm=None)
+    batch_norm = __(batch_norm, batch_norm=False)
 
     __assert_type(name, str)
     __assert_type(stride, int)
+    __assert_value(mode, 'STANDARD', 'DEPTH_SEP')
     __assert_value(activation, tf.sigmoid, tf.tanh, tf.nn.relu, tf.nn.relu6, tf.nn.crelu, tf.nn.softplus, tf.nn.softsign)
     __assert_value(padding, 'VALID', 'SAME')
     __assert_shape(k_shape, 3)  # k_height, k_width, out_channel = k_shape
@@ -143,10 +144,17 @@ def convolution(name, k_shape, stride=None, padding=None, random=None, activatio
         in_channel = value.shape.as_list()[-1]
 
         with tf.variable_scope(name):
-            shape = [k_height, k_width, in_channel, out_channel]
 
-            filt = tf.get_variable('weight', shape, initializer=__initializer(random), trainable=training, dtype=data_type)
-            conv = tf.nn.conv2d(value, filt, [1, stride, stride, 1], padding)
+            if mode == 'STANDARD':
+                shape = [k_height, k_width, in_channel, out_channel]
+                filt = tf.get_variable('weight', shape, initializer=__initializer(random), trainable=training, dtype=data_type)
+                conv = tf.nn.conv2d(value, filt, [1, stride, stride, 1], padding)
+            else:
+                depthwise_k, pointwise_k = [k_height, k_width, in_channel, 1], [1, 1, in_channel, out_channel]
+                depthwise_filt = tf.get_variable('depth_wise', depthwise_k, initializer=__initializer(random), trainable=training, dtype=data_type)
+                pointwise_filt = tf.get_variable('point_wise', pointwise_k, initializer=__initializer(random), trainable=training, dtype=data_type)
+                conv = tf.nn.separable_conv2d(value, depthwise_filt, pointwise_filt, [1, stride, stride, 1], padding)
+                filt = {'depth_wise': depthwise_filt, 'point_wise': pointwise_filt}
 
             if batch_norm:
                 bias = None

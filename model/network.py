@@ -41,7 +41,20 @@ class Net(object):
     def _show_weight_and_bias(show_fn, *args):
         for var in args:
             with tf.name_scope(var.naming):
-                show_fn(weight=var.vars.weight, bias=var.vars.bias)
+                weight, bias = var.vars.weight, var.vars.bias
+                if isinstance(weight, dict):
+                    with tf.name_scope('weight'):
+                        show_fn(**weight)
+                else:
+                    assert isinstance(weight, tf.Variable)
+                    show_fn(weight=weight)
+
+                if isinstance(bias, dict):
+                    with tf.name_scope('bias'):
+                        show_fn(**bias)
+                else:
+                    assert bias is None or isinstance(bias, tf.Variable)
+                    show_fn(bias=bias)
 
     @staticmethod
     def _show_branch_graph(show_fn, *args):
@@ -163,55 +176,44 @@ class MobileNet(Net):
 
     def __init__(self, is_training=True):
         with tf.variable_scope('SDD-MobileNet'):
-            with layer.default(layer, batch_norm=True, training=is_training),\
+            with layer.default(layer, training=is_training), \
+                 layer.default([layer.convolution], mode='DEPTH_SEP', batch_norm=True), \
                  layer.default([layer.normalization], batch_shift=True, batch_scale=True, batch_decay=0.9997):
                 self.__build_network()
 
         self.__build_summary()
 
     def __build_network(self):
-
+        from functools import reduce
         FLAGS = tf.app.flags.FLAGS
 
-        self.images = layer.data('Input', [None, 128, 128, 1])
+        self.conv_ds = {}
+
+        self.images = layer.data('Input', [None, 224, 224, 1])
         self.labels = layer.data('Label', [None], tf.int64)
 
-        self.conv1 = layer.convolution('Conv_3x3', [3, 3, 32], stride=2)(self.images)
+        self.conv1 = layer.convolution('Conv_3x3', [3, 3, 32], stride=2, mode='STANDARD')(self.images)
 
-        self.conv_ds = {}
-        with tf.variable_scope('Conv_DS_64'):
-            conv_dw = layer.convolution('DepthWise', [3, 3, 1], stride=1)(self.conv1)
-            conv_pw = layer.convolution('PointWise', [1, 1, 64])(conv_dw)
-            self.conv_ds['Conv_DS_64'] = conv_dw, conv_pw
+        self.conv_ds_64 = layer.convolution('Conv_DS_64', [3, 3, 64], stride=1)(self.conv1)
+        self.conv_ds_128 = layer.convolution('Conv_DS_128', [3, 3, 128], stride=2)(self.conv_ds_64)
+        self.conv_ds_256 = layer.convolution('Conv_DS_256', [3, 3, 256], stride=1)(self.conv_ds_128)
+        self.conv_ds_512 = layer.convolution('Conv_DS_512', [3, 3, 512], stride=2)(self.conv_ds_256)
 
-        with tf.variable_scope('Conv_DS_128'):
-            conv_dw = layer.convolution('DepthWise', [3, 3, 1], stride=2)(conv_pw)
-            conv_pw = layer.convolution('PointWise', [1, 1, 128])(conv_dw)
-            self.conv_ds['Conv_DS_128'] = conv_dw, conv_pw
+        conv_ds_512 = [
+            layer.convolution('Conv_DS_512_%d' % (i+1), [3, 3, 512], stride=1, padding='SAME')
+            for i in range(5)
+        ]
+        conv_ds_1024 = [
+            layer.convolution('Conv_DS_1024_%d' % (i+1), [3, 3, 1024], stride=2-i)
+            for i in range(2)
+        ]
 
-        with tf.variable_scope('Conv_DS_256'):
-            conv_dw = layer.convolution('DepthWise', [3, 3, 1], stride=1)(conv_pw)
-            conv_pw = layer.convolution('PointWise', [1, 1, 256])(conv_dw)
-            self.conv_ds['Conv_DS_256'] = conv_dw, conv_pw
+        (
+         self.conv_ds_512_1, self.conv_ds_512_2, self.conv_ds_512_3, self.conv_ds_512_4, self.conv_ds_512_5,
+         self.conv_ds_1024_1, self.conv_ds_1024_2
+        ) = reduce(lambda c_val, c_def: c_val + [c_def(c_val[-1])], conv_ds_512 + conv_ds_1024, [self.conv_ds_512])[1:]
 
-        with tf.variable_scope('Conv_DS_512'):
-            conv_dw = layer.convolution('DepthWise', [3, 3, 1], stride=2)(conv_pw)
-            conv_pw = layer.convolution('PointWise', [1, 1, 512])(conv_dw)
-            self.conv_ds['Conv_DS_512'] = conv_dw, conv_pw
-
-        for i in range(5):
-            with tf.variable_scope('Conv_DS_512_%d' % (i+1)):
-                conv_dw = layer.convolution('DepthWise', [3, 3, 1], stride=1, padding='SAME')(conv_pw)
-                conv_pw = layer.convolution('PointWise', [1, 1, 512])(conv_dw)
-                self.conv_ds['Conv_DS_512_%d' % (i+1)] = conv_dw, conv_pw
-
-        for i in range(2):
-            with tf.variable_scope('Conv_DS_1024_%d' % (i+1)):
-                conv_dw = layer.convolution('DepthWise', [3, 3, 1], stride=2)(conv_pw)
-                conv_pw = layer.convolution('PointWise', [1, 1, 1024])(conv_dw)
-                self.conv_ds['Conv_DS_1024_%d' % (i+1)] = conv_dw, conv_pw
-
-        self.pool = layer.pooling('AvgPool_7x7', [7, 7], 'AVG')(conv_pw)
+        self.pool = layer.pooling('AvgPool_7x7', [7, 7], 'AVG')(self.conv_ds_1024_2)
         self.fc = layer.density('FC_1024', 1024)(self.pool)
         self.logits = layer.density('FC_2', 2, linear=True)(self.fc)
         self.loss = layer.loss('Loss')(self.logits, self.labels)
@@ -237,13 +239,18 @@ class MobileNet(Net):
             Net._show_weight_and_bias(show_tensor, self.fc, self.logits)
             Net._show_weight_and_bias(show_grad, self.fc, self.logits)
 
-        import re
-        ds_regex = re.compile('^Conv_DS_([0-9]+).*$')
-        ds_types = [ds_regex.findall(k)[0] for k in self.conv_ds.keys()]
-        for ds_prefix in ds_types:
-            for ds_name in self.conv_ds.keys():
-                if ds_prefix in ds_regex.findall(ds_name):
-                    with tf.name_scope(ds_prefix):
-                        Net._show_weight_and_bias(show_tensor, *self.conv_ds[ds_name])
-                        Net._show_weight_and_bias(show_grad(), *self.conv_ds[ds_name])
+        with tf.name_scope('DepthSep'):
+            Net._show_weight_and_bias(show_tensor, self.conv_ds_64, self.conv_ds_128, self.conv_ds_256)
+            Net._show_weight_and_bias(show_grad, self.conv_ds_64, self.conv_ds_128, self.conv_ds_256)
 
+        with tf.name_scope('DepthSep_512'):
+            Net._show_weight_and_bias(
+                show_tensor, self.conv_ds_512,
+                self.conv_ds_512_1, self.conv_ds_512_2, self.conv_ds_512_3, self.conv_ds_512_4, self.conv_ds_512_5)
+            Net._show_weight_and_bias(
+                show_grad, self.conv_ds_512,
+                self.conv_ds_512_1, self.conv_ds_512_2, self.conv_ds_512_3, self.conv_ds_512_4, self.conv_ds_512_5)
+
+        with tf.name_scope('DepthSep_1024'):
+            Net._show_weight_and_bias(show_tensor, self.conv_ds_1024_1, self.conv_ds_1024_2)
+            Net._show_weight_and_bias(show_grad, self.conv_ds_1024_1, self.conv_ds_1024_2)
