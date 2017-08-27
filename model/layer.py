@@ -119,20 +119,21 @@ def loss(name):
     return __
 
 
-def convolution(name, k_shape, stride=None, padding=None, random=None, active=None, batch_norm=None, training=None, data_type=None):
+def convolution(name, k_shape, stride=None, padding=None, random=None, activation=None,
+                depth_separable=False, batch_norm=None, training=None, data_type=None):
 
     __ = _Scope.default_param(convolution)
     stride = __(stride, stride=1)
     random = __(random, random='xavier')
-    active = __(active, active=tf.nn.relu)
     padding = __(padding, padding='valid').upper()
+    activation = __(activation, activation=tf.nn.relu)
     training = __(training, training=True)
     data_type = __(data_type, data_type=tf.float32)
     batch_norm = __(batch_norm, batch_norm=None)
 
     __assert_type(name, str)
     __assert_type(stride, int)
-    __assert_value(active, tf.sigmoid, tf.tanh, tf.nn.relu, tf.nn.relu6, tf.nn.crelu, tf.nn.softplus, tf.nn.softsign)
+    __assert_value(activation, tf.sigmoid, tf.tanh, tf.nn.relu, tf.nn.relu6, tf.nn.crelu, tf.nn.softplus, tf.nn.softsign)
     __assert_value(padding, 'VALID', 'SAME')
     __assert_shape(k_shape, 3)  # k_height, k_width, out_channel = k_shape
 
@@ -154,7 +155,7 @@ def convolution(name, k_shape, stride=None, padding=None, random=None, active=No
                 bias = tf.get_variable('bias', conv.shape[-1:], initializer=__initializer(), trainable=training, dtype=data_type)
                 output = tf.nn.bias_add(conv, bias)
 
-            act = active(output)
+            act = activation(output)
             __attach_ops(act, conv=conv, active=act)
             __attach_vars(act, weight=filt, bias=bias)
             return __attach_attr(act, naming=name)
@@ -194,7 +195,7 @@ def pooling(name, p_shape, mode=None, stride=None, padding=None, training=None, 
             assert p_depth == v_depth * 2
 
             with tf.variable_scope(name):
-                conv = convolution('conv', [p_height, p_width, p_depth-v_depth], stride=stride, padding=padding, training=training, dtype=data_type)(value)
+                conv = convolution('conv', [p_height, p_width, p_depth-v_depth], stride=stride, padding=padding, training=training, data_type=data_type)(value)
                 pool = pooling('pool', [p_height, p_width], mode=mode, stride=stride, padding=padding, training=training)(value)
                 concat = tf.concat([conv, pool], axis=-1, name='depth_concat')
                 __attach_ops(concat, conv=None, pool=pool)
@@ -203,18 +204,18 @@ def pooling(name, p_shape, mode=None, stride=None, padding=None, training=None, 
     return __
 
 
-def density(name, neurons, linear=None, random=None, active=None, training=None, data_type=None):
+def density(name, neurons, linear=None, random=None, activation=None, training=None, data_type=None):
 
     __ = _Scope.default_param(density)
     linear = __(linear, linear=False)
     random = __(random, random='gauss')
-    active = __(active, active=tf.nn.relu)
+    activation = __(activation, activation=tf.nn.relu)
     training = __(training, training=True)
     data_type = __(data_type, data_type=tf.float32)
 
     __assert_type(name, str)
     __assert_type(neurons, int)
-    __assert_value(active, tf.sigmoid, tf.tanh, tf.nn.relu, tf.nn.relu6, tf.nn.crelu, tf.nn.softplus, tf.nn.softsign)
+    __assert_value(activation, tf.sigmoid, tf.tanh, tf.nn.relu, tf.nn.relu6, tf.nn.crelu, tf.nn.softplus, tf.nn.softsign)
 
     def __(value):
         with tf.variable_scope(name):
@@ -224,7 +225,7 @@ def density(name, neurons, linear=None, random=None, active=None, training=None,
             weight = tf.get_variable('weight', shape, initializer=__initializer(random), trainable=training, dtype=data_type)
             bias = tf.get_variable('bias', [neurons], initializer=__initializer(), trainable=training, dtype=data_type)
             fc = tf.nn.bias_add(tf.matmul(value, weight), bias)
-            act = None if linear else active(fc)
+            act = None if linear else activation(fc)
 
             dense = fc if linear else act
             __attach_ops(dense, dense=fc, active=act)

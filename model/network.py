@@ -157,3 +157,93 @@ class HCCR_GoogLeNet(Net):
             Net._show_weight_and_bias(show_grad, self.conv1, self.conv2, self.conv3, self.conv4)
             Net._show_branch_graph(show_grad, self.incp1, self.incp2, self.incp3, self.incp4)
             Net._show_weight_and_bias(show_grad, self.fc, self.logits)
+
+
+class MobileNet(Net):
+
+    def __init__(self, is_training=True):
+        with tf.variable_scope('SDD-MobileNet'):
+            with layer.default(layer, batch_norm=True, training=is_training),\
+                 layer.default([layer.normalization], batch_shift=True, batch_scale=True, batch_decay=0.9997):
+                self.__build_network()
+
+        self.__build_summary()
+
+    def __build_network(self):
+
+        FLAGS = tf.app.flags.FLAGS
+
+        self.images = layer.data('Input', [None, 128, 128, 1])
+        self.labels = layer.data('Label', [None], tf.int64)
+
+        self.conv1 = layer.convolution('Conv_3x3', [3, 3, 32], stride=2)(self.images)
+
+        self.conv_ds = {}
+        with tf.variable_scope('Conv_DS_64'):
+            conv_dw = layer.convolution('DepthWise', [3, 3, 1], stride=1)(self.conv1)
+            conv_pw = layer.convolution('PointWise', [1, 1, 64])(conv_dw)
+            self.conv_ds['Conv_DS_64'] = conv_dw, conv_pw
+
+        with tf.variable_scope('Conv_DS_128'):
+            conv_dw = layer.convolution('DepthWise', [3, 3, 1], stride=2)(conv_pw)
+            conv_pw = layer.convolution('PointWise', [1, 1, 128])(conv_dw)
+            self.conv_ds['Conv_DS_128'] = conv_dw, conv_pw
+
+        with tf.variable_scope('Conv_DS_256'):
+            conv_dw = layer.convolution('DepthWise', [3, 3, 1], stride=1)(conv_pw)
+            conv_pw = layer.convolution('PointWise', [1, 1, 256])(conv_dw)
+            self.conv_ds['Conv_DS_256'] = conv_dw, conv_pw
+
+        with tf.variable_scope('Conv_DS_512'):
+            conv_dw = layer.convolution('DepthWise', [3, 3, 1], stride=2)(conv_pw)
+            conv_pw = layer.convolution('PointWise', [1, 1, 512])(conv_dw)
+            self.conv_ds['Conv_DS_512'] = conv_dw, conv_pw
+
+        for i in range(5):
+            with tf.variable_scope('Conv_DS_512_%d' % (i+1)):
+                conv_dw = layer.convolution('DepthWise', [3, 3, 1], stride=1, padding='SAME')(conv_pw)
+                conv_pw = layer.convolution('PointWise', [1, 1, 512])(conv_dw)
+                self.conv_ds['Conv_DS_512_%d' % (i+1)] = conv_dw, conv_pw
+
+        for i in range(2):
+            with tf.variable_scope('Conv_DS_1024_%d' % (i+1)):
+                conv_dw = layer.convolution('DepthWise', [3, 3, 1], stride=2)(conv_pw)
+                conv_pw = layer.convolution('PointWise', [1, 1, 1024])(conv_dw)
+                self.conv_ds['Conv_DS_1024_%d' % (i+1)] = conv_dw, conv_pw
+
+        self.pool = layer.pooling('AvgPool_7x7', [7, 7], 'AVG')(conv_pw)
+        self.fc = layer.density('FC_1024', 1024)(self.pool)
+        self.logits = layer.density('FC_2', 2, linear=True)(self.fc)
+        self.loss = layer.loss('Loss')(self.logits, self.labels)
+
+    def __build_summary(self):
+
+        def show_tensor(**args):
+            Net._show_tensor(self.loss, **args)
+
+        def show_grad(**args):
+            Net._show_grad(self.loss, **args)
+
+        with tf.name_scope('Performance'):
+            self.accuracy = tf.reduce_mean(tf.cast(
+                tf.equal(self.labels, tf.argmax(self.logits, 1)), tf.float32))
+            Net._show_scalar(loss=self.loss, accuracy=self.accuracy)
+
+        with tf.name_scope('Convolution'):
+            Net._show_weight_and_bias(show_tensor, self.conv1)
+            Net._show_weight_and_bias(show_grad, self.conv1)
+
+        with tf.name_scope('FullyConnection'):
+            Net._show_weight_and_bias(show_tensor, self.fc, self.logits)
+            Net._show_weight_and_bias(show_grad, self.fc, self.logits)
+
+        import re
+        ds_regex = re.compile('^Conv_DS_([0-9]+).*$')
+        ds_types = [ds_regex.findall(k)[0] for k in self.conv_ds.keys()]
+        for ds_prefix in ds_types:
+            for ds_name in self.conv_ds.keys():
+                if ds_prefix in ds_regex.findall(ds_name):
+                    with tf.name_scope(ds_prefix):
+                        Net._show_weight_and_bias(show_tensor, *self.conv_ds[ds_name])
+                        Net._show_weight_and_bias(show_grad(), *self.conv_ds[ds_name])
+
