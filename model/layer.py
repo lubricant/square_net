@@ -119,7 +119,7 @@ def loss(name):
     return __
 
 
-def convolution(name, k_shape, stride=None, padding=None, mode=None, random=None, activation=None, batch_norm=None, training=None, data_type=None):
+def convolution(name, k_shape, stride=None, padding=None, mode=None, linear=None, random=None, activation=None, batch_norm=None, training=None, data_type=None):
 
     __ = _Scope.default_param(convolution)
     mode = __(mode, mode='standard').upper()
@@ -158,15 +158,19 @@ def convolution(name, k_shape, stride=None, padding=None, mode=None, random=None
 
             if batch_norm:
                 bias = None
-                output = normalization('batch_norm', 'BATCH', training=training, data_type=data_type)(conv)
+                norm = normalization('batch_norm', 'BATCH', training=training, data_type=data_type)(conv)
+                inner_prod = norm + .0  # is not good ...
             else:
+                norm = None
                 bias = tf.get_variable('bias', conv.shape[-1:], initializer=__initializer(), trainable=training, dtype=data_type)
-                output = tf.nn.bias_add(conv, bias)
+                inner_prod = tf.nn.bias_add(conv, bias)
 
-            act = activation(output)
-            __attach_ops(act, conv=conv, active=act)
-            __attach_vars(act, weight=filt, bias=bias)
-            return __attach_attr(act, naming=name)
+            act = None if linear else activation(inner_prod)
+            feature = inner_prod if linear else act
+
+            __attach_ops(feature, conv=conv, norm=norm, active=act)
+            __attach_vars(feature, weight=filt, bias=bias)
+            return __attach_attr(feature, naming=name)
 
     return __
 

@@ -187,9 +187,7 @@ class MobileNet(Net):
         from functools import reduce
         FLAGS = tf.app.flags.FLAGS
 
-        self.conv_ds = {}
-
-        self.images = layer.data('Input', [None, 224, 224, 1])
+        self.images = layer.data('Input', [None, 128, 128, 1])
         self.labels = layer.data('Label', [None], tf.int64)
 
         self.conv1 = layer.convolution('Conv_3x3', [3, 3, 32], stride=2, mode='STANDARD')(self.images)
@@ -213,9 +211,16 @@ class MobileNet(Net):
          self.conv_ds_1024_1, self.conv_ds_1024_2
         ) = reduce(lambda c_val, c_def: c_val + [c_def(c_val[-1])], conv_ds_512 + conv_ds_1024, [self.conv_ds_512])[1:]
 
-        self.pool = layer.pooling('AvgPool_7x7', [7, 7], 'AVG')(self.conv_ds_1024_2)
-        self.fc = layer.density('FC_1024', 1024)(self.pool)
-        self.logits = layer.density('FC_2', 2, linear=True)(self.fc)
+        last_conv_shape = self.conv_ds_1024_2.shape.as_list()
+        last_height, last_width = last_conv_shape[1:3]
+        pool_shape = [min(last_height, 7), min(last_width, 7)]  # make sure pool result shape is : [?, 1, 1, 1024]
+
+        self.pool = layer.pooling('AvgPool_7x7', pool_shape, 'AVG')(self.conv_ds_1024_2)
+        self.dropout = layer.dropout('Dropout')(self.pool)
+        self.conv2 = layer.convolution('Conv_FC', [1, 1, 2], mode='STANDARD', linear=True)(self.dropout)
+        self.keep_prob = self.dropout.vars.keep_prob
+
+        self.logits = tf.squeeze(self.conv2, [1, 2], 'SpatialSqueeze')
         self.loss = layer.loss('Loss')(self.logits, self.labels)
 
     def __build_summary(self):
@@ -232,12 +237,8 @@ class MobileNet(Net):
             Net._show_scalar(loss=self.loss, accuracy=self.accuracy)
 
         with tf.name_scope('Convolution'):
-            Net._show_weight_and_bias(show_tensor, self.conv1)
-            Net._show_weight_and_bias(show_grad, self.conv1)
-
-        with tf.name_scope('FullyConnection'):
-            Net._show_weight_and_bias(show_tensor, self.fc, self.logits)
-            Net._show_weight_and_bias(show_grad, self.fc, self.logits)
+            Net._show_weight_and_bias(show_tensor, self.conv1, self.conv2)
+            Net._show_weight_and_bias(show_grad, self.conv1, self.conv2)
 
         with tf.name_scope('DepthSep'):
             Net._show_weight_and_bias(show_tensor, self.conv_ds_64, self.conv_ds_128, self.conv_ds_256)
@@ -254,3 +255,5 @@ class MobileNet(Net):
         with tf.name_scope('DepthSep_1024'):
             Net._show_weight_and_bias(show_tensor, self.conv_ds_1024_1, self.conv_ds_1024_2)
             Net._show_weight_and_bias(show_grad, self.conv_ds_1024_1, self.conv_ds_1024_2)
+
+MobileNet()
