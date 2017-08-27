@@ -107,3 +107,5 @@ ENV/
 /data/casia
 /data/tfrecord
 /data/record
+/data/hit_ch
+/data/hit_doc
