@@ -217,7 +217,7 @@ class MobileNet(Net):
 
         self.pool = layer.pooling('AvgPool_7x7', pool_shape, 'AVG')(self.conv_ds_1024_2)
         self.dropout = layer.dropout('Dropout')(self.pool)
-        self.conv2 = layer.convolution('Conv_FC', [1, 1, 2], mode='STANDARD', linear=True)(self.dropout)
+        self.conv2 = layer.convolution('Conv_FC', [1, 1, 2], mode='STANDARD', linear=True, batch_norm=False)(self.dropout)
         self.keep_prob = self.dropout.vars.keep_prob
 
         self.logits = tf.squeeze(self.conv2, [1, 2], 'SpatialSqueeze')
@@ -255,5 +255,3 @@ class MobileNet(Net):
         with tf.name_scope('DepthSep_1024'):
             Net._show_weight_and_bias(show_tensor, self.conv_ds_1024_1, self.conv_ds_1024_2)
             Net._show_weight_and_bias(show_grad, self.conv_ds_1024_1, self.conv_ds_1024_2)
-
-MobileNet()

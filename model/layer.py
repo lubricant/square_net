@@ -124,6 +124,7 @@ def convolution(name, k_shape, stride=None, padding=None, mode=None, linear=None
     __ = _Scope.default_param(convolution)
     mode = __(mode, mode='standard').upper()
     stride = __(stride, stride=1)
+    linear = __(linear, linear=False)
     random = __(random, random='xavier')
     padding = __(padding, padding='valid').upper()
     activation = __(activation, activation=tf.nn.relu)
