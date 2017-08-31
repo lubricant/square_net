@@ -46,8 +46,7 @@ else:
     flags.DEFINE_integer('batch_size', 100, 'Batch size of each step.')
 
     flags.DEFINE_integer('restore_version', 690000, 'Specify the checkpoint to be restored.')
-    flags.DEFINE_boolean('export_graph', True, 'Export graph to file.')
-    flags.DEFINE_string('graph_filename', 'graph.pb', 'Save graph to file.')
+    flags.DEFINE_boolean('export_model', True, 'Export model parameter and graph to file.')
 
 '''
     Custom logging config
