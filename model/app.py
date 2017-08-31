@@ -161,6 +161,11 @@ def evaluating_routine(network, queue_op):
             saver.restore(sess, checkpoint.model_checkpoint_path)
         logging.info('Loading checkpoint done')
 
+        if FLAGS.export_graph:
+            logging.info('Exporting graph ...')
+            tf.train.write_graph(sess.graph_def, data.TEMP_ROOT + '/tmp', FLAGS.graph_filename, as_text=True)
+            logging.info('Exporting graph done')
+
         coord = tf.train.Coordinator()
         threads = tf.train.start_queue_runners(sess=sess, coord=coord)
 
