@@ -89,7 +89,7 @@ def __initializer(mode=None):
     return init_ops.variance_scaling_initializer(scale=1., distribution='uniform', mode='fan_'+fan_type)
 
 
-def data(name, shape, data_type=None):
+def data(name, shape, data_type=None, **void):
 
     _ = _Scope.default_param(data)
     data_type = _(data_type, data_type=tf.float32)
@@ -102,7 +102,7 @@ def data(name, shape, data_type=None):
         return __attach_attr(tf.placeholder(data_type, shape, name='data'), naming=name)
 
 
-def loss(name):
+def loss(name, **void):
 
     def __(logits, labels):
         __assert_shape(logits.shape.as_list(), 2)  # batch_size, num_classes = logits.shape
@@ -119,7 +119,7 @@ def loss(name):
     return __
 
 
-def convolution(name, k_shape, stride=None, padding=None, mode=None, linear=None, random=None, activation=None, batch_norm=None, training=None, data_type=None):
+def convolution(name, k_shape, stride=None, padding=None, mode=None, linear=None, random=None, activation=None, batch_norm=None, training=None, data_type=None, **void):
 
     __ = _Scope.default_param(convolution)
     mode = __(mode, mode='standard').upper()
@@ -131,9 +131,11 @@ def convolution(name, k_shape, stride=None, padding=None, mode=None, linear=None
     training = __(training, training=True)
     data_type = __(data_type, data_type=tf.float32)
     batch_norm = __(batch_norm, batch_norm=False)
+    collection = __(None, collection=None)
 
     __assert_type(name, str)
     __assert_type(stride, int)
+    __assert_type(collection, str)
     __assert_value(mode, 'STANDARD', 'DEPTH_SEP')
     __assert_value(activation, tf.sigmoid, tf.tanh, tf.nn.relu, tf.nn.relu6, tf.nn.crelu, tf.nn.softplus, tf.nn.softsign)
     __assert_value(padding, 'VALID', 'SAME')
@@ -150,12 +152,15 @@ def convolution(name, k_shape, stride=None, padding=None, mode=None, linear=None
                 shape = [k_height, k_width, in_channel, out_channel]
                 filt = tf.get_variable('weight', shape, initializer=__initializer(random), trainable=training, dtype=data_type)
                 conv = tf.nn.conv2d(value, filt, [1, stride, stride, 1], padding)
+                tf.add_to_collection(collection, filt)
             else:
                 depthwise_k, pointwise_k = [k_height, k_width, in_channel, 1], [1, 1, in_channel, out_channel]
                 depthwise_filt = tf.get_variable('depth_wise', depthwise_k, initializer=__initializer(random), trainable=training, dtype=data_type)
                 pointwise_filt = tf.get_variable('point_wise', pointwise_k, initializer=__initializer(random), trainable=training, dtype=data_type)
                 conv = tf.nn.separable_conv2d(value, depthwise_filt, pointwise_filt, [1, stride, stride, 1], padding)
                 filt = {'depth_wise': depthwise_filt, 'point_wise': pointwise_filt}
+                tf.add_to_collection(collection, depthwise_filt)
+                tf.add_to_collection(collection, pointwise_filt)
 
             if batch_norm:
                 bias = None
@@ -165,6 +170,7 @@ def convolution(name, k_shape, stride=None, padding=None, mode=None, linear=None
                 norm = None
                 bias = tf.get_variable('bias', conv.shape[-1:], initializer=__initializer(), trainable=training, dtype=data_type)
                 inner_prod = tf.nn.bias_add(conv, bias)
+                tf.add_to_collection(collection, bias)
 
             act = None if linear else activation(inner_prod)
             feature = inner_prod if linear else act
@@ -176,7 +182,7 @@ def convolution(name, k_shape, stride=None, padding=None, mode=None, linear=None
     return __
 
 
-def pooling(name, p_shape, mode=None, stride=None, padding=None, training=None, data_type=None):
+def pooling(name, p_shape, mode=None, stride=None, padding=None, training=None, data_type=None, **void):
 
     __ = _Scope.default_param(pooling)
     mode = __(mode, mode='MAX').upper()
@@ -217,7 +223,7 @@ def pooling(name, p_shape, mode=None, stride=None, padding=None, training=None, 
     return __
 
 
-def density(name, neurons, linear=None, random=None, activation=None, training=None, data_type=None):
+def density(name, neurons, linear=None, random=None, activation=None, training=None, data_type=None, **void):
 
     __ = _Scope.default_param(density)
     linear = __(linear, linear=False)
@@ -225,9 +231,11 @@ def density(name, neurons, linear=None, random=None, activation=None, training=N
     activation = __(activation, activation=tf.nn.relu)
     training = __(training, training=True)
     data_type = __(data_type, data_type=tf.float32)
+    collection = __(None, collection=None)
 
     __assert_type(name, str)
     __assert_type(neurons, int)
+    __assert_type(collection, str)
     __assert_value(activation, tf.sigmoid, tf.tanh, tf.nn.relu, tf.nn.relu6, tf.nn.crelu, tf.nn.softplus, tf.nn.softsign)
 
     def __(value):
@@ -237,9 +245,12 @@ def density(name, neurons, linear=None, random=None, activation=None, training=N
             shape = value.shape[1:].as_list() + [neurons]
             weight = tf.get_variable('weight', shape, initializer=__initializer(random), trainable=training, dtype=data_type)
             bias = tf.get_variable('bias', [neurons], initializer=__initializer(), trainable=training, dtype=data_type)
+
+            tf.add_to_collection(collection, weight)
+            tf.add_to_collection(collection, bias)
+
             fc = tf.nn.bias_add(tf.matmul(value, weight), bias)
             act = None if linear else activation(fc)
-
             dense = fc if linear else act
             __attach_ops(dense, dense=fc, active=act)
             __attach_vars(dense, weight=weight, bias=bias)
@@ -248,7 +259,7 @@ def density(name, neurons, linear=None, random=None, activation=None, training=N
     return __
 
 
-def inception(name, *graph, training=None):
+def inception(name, *graph, training=None, **void):
 
     assert graph
     assert all(isinstance(x, list) for x in graph)
@@ -331,7 +342,7 @@ __attach_attr(inception, **{
 })
 
 
-def dropout(name, noise_shape=None):
+def dropout(name, noise_shape=None, **void):
 
     _ = _Scope.default_param(dropout)
     noise_shape = _(noise_shape, noise_shape=None)
@@ -348,14 +359,16 @@ def dropout(name, noise_shape=None):
 
 def normalization(name, mode=None, training=None, data_type=None,
                   batch_scale=None, batch_shift=None, batch_epsilon=None, batch_decay=None,
-                  local_depth=None, local_bias=None, local_alpha=None, local_beta=None):
+                  local_depth=None, local_bias=None, local_alpha=None, local_beta=None, **void):
 
     __ = _Scope.default_param(normalization)
     mode = __(mode, mode='BATCH').upper()
     training = __(training, training=True)
     data_type = __(data_type, data_type=tf.float32)
+    collection = __(None, collection=None)
 
     __assert_value(mode, 'LOCAL', 'BATCH')
+    __assert_type(collection, str)
 
     depth = __(local_depth, local_depth=5)
     bias = __(local_bias, local_bias=1.)
@@ -389,6 +402,9 @@ def normalization(name, mode=None, training=None, data_type=None,
 
             scale = tf.get_variable('gamma', channel, initializer=tf.ones_initializer(), trainable=training and scaling, dtype=data_type)
             shift = tf.get_variable('beta', channel, initializer=tf.zeros_initializer(), trainable=training and shifting, dtype=data_type)
+
+            tf.add_to_collection(collection, scale)
+            tf.add_to_collection(collection, shift)
 
             norm, mean, variance = tf.nn.fused_batch_norm(
                 value, name='batch_norm', scale=scale, offset=shift, epsilon=epsilon, is_training=training)

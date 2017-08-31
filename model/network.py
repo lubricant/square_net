@@ -74,7 +74,7 @@ class HCCR_GoogLeNet(Net):
 
     def __init__(self, is_training=True):
         with tf.variable_scope('HCCR-GoogLeNet'):
-            with layer.default(layer, training=is_training):
+            with layer.default(layer, training=is_training, collection=HCCR_GoogLeNet.__name__):
                 self.__build_network()
 
         self.__build_summary()
@@ -176,7 +176,7 @@ class MobileNet(Net):
 
     def __init__(self, is_training=True):
         with tf.variable_scope('SDD-MobileNet'):
-            with layer.default(layer, training=is_training), \
+            with layer.default(layer, training=is_training, collection=MobileNet.__name__), \
                  layer.default([layer.convolution], mode='DEPTH_SEP', batch_norm=True), \
                  layer.default([layer.normalization], batch_shift=True, batch_scale=True, batch_decay=0.9997):
                 self.__build_network()
