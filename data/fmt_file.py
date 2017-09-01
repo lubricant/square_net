@@ -1,4 +1,4 @@
-import os
+from collections import namedtuple
 import os.path as path
 import struct
 
@@ -6,6 +6,8 @@ import numpy as np
 from tensorflow.python import gfile as gf
 
 from data import *
+
+LabelWithLoc = namedtuple('LabelWithLoc', 'label, top, left, height, width')
 
 
 class File(object):
@@ -155,11 +157,11 @@ class HITFile(File):
     def list_file(full_path=True):
 
         images_files = ['%d_images' % i for i in range(1, 123)]
-        images_paths = [PWD + '/hit_ch/' + f for f in images_files]
+        images_paths = [PWD + '/hit/' + f for f in images_files]
         assert all(path.exists(p) for p in images_paths if path.isfile(p))
 
         labels_file = ['labels'] * 122
-        labels_path = [PWD + '/hit_ch/labels'] * 122
+        labels_path = [PWD + '/hit/labels'] * 122
         assert path.exists(labels_path[0])
 
         return [*zip(images_paths, labels_path)] if full_path else [*zip(images_files, labels_file)]
@@ -256,8 +258,70 @@ class TFRecordFile(File):
             self.__tf_writer = None
 
 
+class CasiaDocFile(File):
+
+    @staticmethod
+    def list_file(full_path=True):
+        doc_paths = glob.glob(PWD + '/casia_doc/*.dgr')
+        doc_files = [path.basename(p) for p in doc_paths]
+        return doc_paths if full_path else doc_files
+
+    def __init__(self, filename, reverse_pixel=True, full_doc=False):
+        super().__init__(path.basename(filename))
+        assert path.exists(filename)
+        self.__path = filename
+        self.__reverse = reverse_pixel
+        self.__full = full_doc
+
+    def __iter__(self):
+        assert not path.isdir(self.__path)
+
+        with open(self.__path, 'rb') as file:
+
+            head_size, = struct.unpack('<I', file.read(4))
+            fmt_code = struct.unpack('<8B', file.read(8))
+            illus_txt = struct.unpack('<%dB' % (head_size-36), file.read(head_size-36))
+            code_type = file.read(20).decode('ASCII').replace('\0', '')
+            code_len, pix_bits = struct.unpack('<2H', file.read(4))
+            img_row, img_col, line_num = struct.unpack('<3I', file.read(12))
+
+            code_type = 'GBK' if code_type == 'GB' else code_type
+
+            assert pix_bits == 8
+            assert code_type in ('ASCII', 'GBK')
+
+            if self.__full:
+                doc_img = np.zeros((img_row, img_col), np.uint8) + 255
+                doc_lab = []
+
+                for i in range(line_num):
+                    word_num, = struct.unpack('<I', file.read(4))
+                    for j in range(word_num):
+                        label = file.read(code_len).decode(code_type)
+                        top, left, height, width = struct.unpack('<4H', file.read(8))
+                        doc_lab.append(LabelWithLoc(label, top, left, height, width))
+                        word = np.fromfile(file, np.uint8, height * width).reshape((height, width))
+                        doc_img[top:top + height, left:left + width] = word
+                yield doc_lab, doc_img
+            else:
+                pass
+                # for i in range(line_num):
+                #     word_num, = struct.unpack('<I', file.read(4))
+                #     img_line, lab_line = [], []
+                #
+                #     for j in range(word_num):
+                #         label = file.read(code_len).decode(code_type)
+                #         top, left, height, width = struct.unpack('<4H', file.read(8))
+                #         lab_line.append(LabelWithLoc(label, top, left, height, width))
+                #         word = np.fromfile(file, np.uint8, height * width).reshape((height, width))
+                #         img_line.append(word)
+                #
+                #     yield doc_lab, doc_img
+
+
 if __name__ == '__main__':
 
+    import cv2
     import matplotlib.pyplot as plt
 
     def try_mist():
@@ -319,4 +383,17 @@ if __name__ == '__main__':
 
     # try_mist()
     # try_casi()
-    try_hit()
+    # try_hit()
+
+
+    def try_casia_doc():
+        for f in CasiaDocFile.list_file():
+            for label, image in CasiaDocFile(f, full_doc=True):
+                img_copy = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
+                for win in label:
+                    for ch, top, left, height, width in label:
+                        cv2.rectangle(img_copy, (left, top), (left + width, top + height), (255, 0, 0), thickness=5)
+                plt.imshow(img_copy)
+                plt.show()
+
+    try_casia_doc()
