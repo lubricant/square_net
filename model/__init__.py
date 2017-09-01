@@ -11,7 +11,7 @@ import data
 '''
 
 flags = tf.app.flags
-flags.DEFINE_boolean('is_training', True, 'Application execute mode.')
+flags.DEFINE_boolean('is_training', False, 'Application execute mode.')
 flags.DEFINE_boolean('exp_decay', False, 'Applying exponential decay to the learning rate.')
 
 flags.DEFINE_float('learning_rate', 0.00001, 'Initial learning rate.')
@@ -45,7 +45,8 @@ else:
     flags.DEFINE_integer("thread_num", 1, 'Number of thread to read data.')
     flags.DEFINE_integer('batch_size', 100, 'Batch size of each step.')
 
-    flags.DEFINE_integer('restore_version', -1, 'Specify the checkpoint to be restored.')
+    flags.DEFINE_integer('restore_version', 690000, 'Specify the checkpoint to be restored.')
+    flags.DEFINE_boolean('export_model', True, 'Export model parameter and graph to file.')
 
 '''
     Custom logging config

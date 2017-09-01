@@ -23,6 +23,11 @@ def label_dict(dict_name='labels_dict.npy'):
     return np.load(PWD + '/blob/' + dict_name)
 
 
+def model_param(model_file='model_params.npy'):
+    assert os.path.exists(PWD + '/blob/' + model_file)
+    return np.load(PWD + '/blob/' + model_file)[0]
+
+
 def data_queue(data_set, batch_size, thread_num=1, epoch_num=None):
 
     assert batch_size > 0 and thread_num > 0

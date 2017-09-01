@@ -192,6 +192,61 @@ class HITFile(File):
                 yield ch, image
 
 
+class HitDocFile(File):
+
+    @staticmethod
+    def list_file(full_path=True):
+
+        assert full_path
+
+        dir_list = [PWD + '/hit_doc/%d' % (i+1) for i in range(1)]
+        image_paths = [('%s/1_images' % d, '%s/2_images' % d) for d in dir_list]
+        label_paths = ['%s/labels' % d for d in dir_list]
+
+        assert all(path.exists(i1) and path.exists(i2) for i1, i2 in image_paths)
+        assert all(path.exists(i) for i in label_paths)
+        return [*zip(image_paths, label_paths)]
+
+    def __init__(self, image_filename, label_filename, reverse_pixel=True):
+        image_filename_1, image_filename_2 = image_filename
+        super().__init__((path.basename(image_filename_1),
+                          path.basename(image_filename_2),
+                          path.basename(label_filename)))
+
+        assert path.exists(image_filename_1) and \
+               path.exists(image_filename_2) and \
+               path.exists(label_filename)
+
+        self.__img_path = image_filename_1, image_filename_2
+        self.__lab_path = label_filename
+        self.__reverse = reverse_pixel
+
+    def __iter__(self):
+        img_path_1 , img_path_2 = self.__img_path
+        with open(self.__lab_path, 'rb') as lab_file, \
+                open(img_path_1, 'rb') as img_file_1, \
+                open(img_path_2, 'rb') as img_file_2:
+
+            lab_num, ch_bytes = struct.unpack('<HB', lab_file.read(3))
+            img_num_1, row_1, col_1 = struct.unpack('<IBB', img_file_1.read(6))
+            img_num_2, row_2, col_2 = struct.unpack('<IBB', img_file_2.read(6))
+
+            labels = lab_file.read(lab_num * ch_bytes).decode('GBK')
+            assert len(labels) == lab_num
+
+            for ch in labels:
+                image = np.fromfile(img_file_1, np.uint8, row_1 * col_1).reshape((row_1, col_1))
+                if self.__reverse:
+                    np.subtract(255, image, image)
+                yield ch, image
+
+            for ch in labels:
+                image = np.fromfile(img_file_2, np.uint8, row_2 * col_2).reshape((row_2, col_2))
+                if self.__reverse:
+                    np.subtract(255, image, image)
+                yield ch, image
+
+
 class TFRecordFile(File):
 
     '''
