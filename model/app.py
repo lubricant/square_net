@@ -163,10 +163,7 @@ def evaluating_routine(network, queue_op):
 
         if FLAGS.export_model:
             logging.info('Exporting model ...')
-            model_params_list = tf.get_collection(network.__class__.__name__)
-            model_params_key = [p.name for p in model_params_list]
-            model_params_val = sess.run(model_params_list)
-            model_params = dict(zip(model_params_key, model_params_val))
+            model_params = network.get_model_params(sess)
             np.save(data.TEMP_ROOT + '/tmp/model_params.npy', (model_params,))
             logging.info('Exporting model done')
 

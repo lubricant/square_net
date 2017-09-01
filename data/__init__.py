@@ -144,5 +144,6 @@ if __name__ == '__main__':
             coord.request_stop()
             coord.join(threads)
 
-    try_rand_queue()
+    # try_queue()
+    # try_rand_queue()
 

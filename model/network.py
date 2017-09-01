@@ -5,6 +5,17 @@ import model.layer as layer
 
 class Net(object):
 
+    def get_model_params(self, sess):
+        var_list = tf.get_collection(self.__class__.__name__)
+        params_key = [p.name for p in var_list]
+        params_val = sess.run(var_list)
+        return dict(zip(params_key, params_val))
+
+    def set_model_params(self, sess, params):
+        var_list = tf.get_collection(self.__class__.__name__)
+        assert all(v.name in params for v in var_list)
+        sess.run([tf.assign(v, params[v.name]) for v in var_list])
+
     @staticmethod
     def _show_scalar(**args):
         for name in args:

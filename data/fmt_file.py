@@ -445,9 +445,8 @@ if __name__ == '__main__':
         for f in CasiaDocFile.list_file():
             for label, image in CasiaDocFile(f, full_doc=True):
                 img_copy = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
-                for win in label:
-                    for ch, top, left, height, width in label:
-                        cv2.rectangle(img_copy, (left, top), (left + width, top + height), (255, 0, 0), thickness=5)
+                for ch, top, left, height, width in label:
+                    cv2.rectangle(img_copy, (left, top), (left + width, top + height), (255, 0, 0), thickness=5)
                 plt.imshow(img_copy)
                 plt.show()
 
