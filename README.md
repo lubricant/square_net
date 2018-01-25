@@ -4,6 +4,6 @@ Partical implemention of [HCCR-GOOGLENET](http://pdfs.semanticscholar.org/71c5/e
 
 A better implemention is [DeepHCCR](https://github.com/chongyangtao/DeepHCCR)
 
-Environment:
-Anaconda3 4.2.0 (Python 3.5)
-TensorFlow 1.0.0 (tensorflow_gpu-1.0.0-cp35-cp35m-win_amd64.whl)
+Environment:  
+Anaconda3 4.2.0 (Python 3.5)  
+TensorFlow 1.0.0 (tensorflow_gpu-1.0.0-cp35-cp35m-win_amd64.whl)  
